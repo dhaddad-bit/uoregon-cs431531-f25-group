@@ -1,0 +1,66 @@
+bcsstk18: 
+    Type: real symmetric positive definite
+    Size: 11948 x 11948
+
+    Name: BCS Structural Engineering Matrices (linear equations)
+          R.E. Ginna Nuclear Power Station
+          from set BCSSTRUC2, from the Harwell-Boeing Collection 
+
+    Source:	Prof Mac Will, Georgia Institute of Technology
+    Discipline:	Static analyses in structural engineering
+    Accession:	Summer 1985
+
+    Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/bcsstruc2/bcsstk18.html
+
+can_24:
+    Type: symmetric indefinite
+    Size: 24 x 24
+
+    Name: Structures problems in aircraft design
+          from set CANNES, from the Harwell-Boeing Collection 
+
+    Source: Lucien Marro, Programmation Scientifique, Aerospatiale Cannes, France. 
+    Discipline: Finite-element structure problems in aircraft design
+    Accession: June 3, 1981
+
+    Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/cannes/can___24.html
+
+e40r5000:
+    Type: real unsymmetric
+    Size: 17281 x 17281
+
+    Name: Driven cavity
+          driven cavity, 40x40 elements, Re=5000
+
+    Source:	Andrew Chapman, University of Minnesota
+    Discipline:	Fluid dynamics
+    Accession:	August 1996
+
+    Link: https://math.nist.gov/MatrixMarket/data/SPARSKIT/drivcav/e40r5000.html
+
+
+lns_131:
+    Type: real unsymmetric
+    Size: 131 x 131
+
+    Name: Fluid flow modeling
+          from set LNS, from the Harwell-Boeing Collection 
+
+    Source: Ian Jones, Harwell Laboratory. 
+    Discipline:	Fluid flow modeling
+    Accession:	Summer 1980
+
+    Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/lns/lns__131.html
+
+plsk1919:
+    Type: real skew symmetric
+    Size: 1919 x 1919
+
+    Name: Platzman's oceanographic models
+          skew-symmetric full model
+    
+    Source:	John Lewis, Boeing Computer Services, Seattle, Washington
+    Discipline:	Oceanic modeling
+    Accession:	Summer 1975
+
+    Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/platz/plsk1919.html
