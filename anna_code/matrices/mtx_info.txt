@@ -12,19 +12,6 @@ bcsstk18:
 
     Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/bcsstruc2/bcsstk18.html
 
-can_24:
-    Type: symmetric indefinite
-    Size: 24 x 24
-
-    Name: Structures problems in aircraft design
-          from set CANNES, from the Harwell-Boeing Collection 
-
-    Source: Lucien Marro, Programmation Scientifique, Aerospatiale Cannes, France. 
-    Discipline: Finite-element structure problems in aircraft design
-    Accession: June 3, 1981
-
-    Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/cannes/can___24.html
-
 e40r5000:
     Type: real unsymmetric
     Size: 17281 x 17281
