@@ -1,13 +1,14 @@
 #include <stdio.h>
 //#include <stdlib.h>
 #include <cstdlib>
-#include <string.h>
+
 #include <assert.h>
 #include <omp.h>
 #include <math.h>
 
 #include "main.h"
 #include "spmv.h"
+#include "csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
@@ -376,75 +377,6 @@ void read_info(char* fileName, int* is_sym)
    return paramters:
        none
  */
-void convert_coo_to_csr(int* row_ind, int* col_ind, double* val, 
-                        int m, int n, int nnz,
-                        unsigned int** csr_row_ptr, unsigned int** csr_col_ind,
-                        double** csr_vals)
-
-{
-    // Temporary pointers
-    unsigned int* row_ptr_;
-    unsigned int* col_ind_;
-    double* vals_;
-    
-    // We now how large the data structures should be
-    // csr_row_ptr -> m + 1
-    // csr_col_ind -> nnz
-    // csr_vals    -> nnz
-    row_ptr_ = (unsigned int*) malloc(sizeof(unsigned int) * (m + 1)); 
-    assert(row_ptr_);
-    col_ind_ = (unsigned int*) malloc(sizeof(unsigned int) * nnz);
-    assert(col_ind_);
-    vals_ = (double*) malloc(sizeof(double) * nnz);
-    assert(vals_);
-
-    // Now determine how many non-zero elements are in each row
-    // Use a histogram to do this
-    unsigned int* buckets = (unsigned int*) malloc(sizeof(unsigned int) * m);
-    assert(buckets);
-    memset(buckets, 0, sizeof(unsigned int) * m);
-
-    for(unsigned int i = 0; i < nnz; i++) {
-        // row_ind[i] - 1 because index in mtx format starts from 1 (not 0)
-        buckets[row_ind[i] - 1]++;
-    }
-
-    // Now use a cumulative sum to determine the starting position of each
-    // row in csr_col_ind and csr_vals - this information is also what is
-    // stored in csr_row_ptr
-    for(unsigned int i = 1; i < m; i++) {
-        buckets[i] = buckets[i] + buckets[i - 1];
-    }
-    // Copy this to csr_row_ptr
-    row_ptr_[0] = 0; 
-    for(unsigned int i = 0; i < m; i++) {
-        row_ptr_[i + 1] = buckets[i];
-    }
-
-    // We can use row_ptr_ to copy the column indices and vals to the 
-    // correct positions in csr_col_ind and csr_vals
-    unsigned int* tmp_row_ptr = (unsigned int*) malloc(sizeof(unsigned int) * 
-                                                       m);
-    assert(tmp_row_ptr);
-    memcpy(tmp_row_ptr, row_ptr_, sizeof(unsigned int) * m);
-
-    // Now go through each non-zero and copy it to its appropriate position
-    for(unsigned int i = 0; i < nnz; i++)  {
-        col_ind_[tmp_row_ptr[row_ind[i] - 1]] = col_ind[i] - 1;
-        vals_[tmp_row_ptr[row_ind[i] - 1]] = val[i];
-        tmp_row_ptr[row_ind[i] - 1]++;
-    }
-
-    // Copy the memory address to the input parameters
-    *csr_row_ptr = row_ptr_;
-    *csr_col_ind = col_ind_;
-    *csr_vals = vals_;
-
-    // Free memory
-    free(tmp_row_ptr);
-    free(buckets);
-}
-
 /* Reads in a vector from file.
    input parameters:
        char*	fileName	name of the file containing the vector
@@ -483,29 +415,6 @@ void read_vector(char* fileName, double** vector, int* vecSize)
     *vecSize = vector_size;
 }
 
-
-/* SpMV function for CSR stored sparse matrix
- */
-void spmv(unsigned int* csr_row_ptr, unsigned int* csr_col_ind, 
-          double* csr_vals, int m, int n, int nnz, 
-          double* vector_x, double *res)
-{
-    // first initialize res to 0
-    #pragma omp parallel for schedule(static)
-    for(int i = 0; i < m; i++) {
-        res[i] = 0.0;
-    }
-
-    // calculate spmv
-    #pragma omp parallel for schedule(static)
-    for(unsigned int i = 0; i < m; i++) {
-        unsigned int row_begin = csr_row_ptr[i];
-        unsigned int row_end = csr_row_ptr[i + 1];
-        for(unsigned int j = row_begin; j < row_end; j++) {
-            res[i] += csr_vals[j] * vector_x[csr_col_ind[j]]; 
-        }
-    }
-}
 
 
 /* Save result vector in a file
@@ -611,113 +520,4 @@ double dnrm2(const int n, double* x, const int incx)
     return sqrt(nrm);
 }
 
-
-void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
-                        double* csr_vals, int m, int n, int nnz, 
-                        unsigned int** ell_col_ind, double** ell_vals, 
-                        int* n_new)
-{
-    // --- Find the max number of non-zeros per row (max_row_length) --- 
-    int max_row_length = 0;
-    for (int i=0; i<m; i++) {
-        int row_length =csr_row_ptr[i+1] - csr_row_ptr[i];
-        if (row_length > max_row_length) {
-            max_row_length = row_length;
-        }
-    }
-    *n_new = max_row_length; // from now on this is the length of our rows
-    int ell_nnz_padded = m * max_row_length;
-    
-    // --- Allocate memory for ELL arrays on the host (CPU) --- 
-    *ell_col_ind = (unsigned int*) malloc(sizeof(unsigned int) * ell_nnz_padded);
-    assert(*ell_col_ind);
-    *ell_vals = (double*) malloc(sizeof(double) * ell_nnz_padded);
-    assert(*ell_vals);
-
-    // --- Initialize ELL arrays to zero for padding use (-1) for col/row and 0 for vals --- 
-    // Can this be done with calloc or memset? Parallelizable with omp? TODO
-    for (int i=0; i<ell_nnz_padded; i++) {
-        (*ell_col_ind)[i] = -1; // UNSIGNED INT ISSUE?;
-        (*ell_vals)[i] = 0.0;
-    }
-        
-    // --- Fill in ELL arrays from CSR arrays --- 
-    // (See slides and paper for details)
-    #pragma omp parallel for schedule(static)
-    for (int i=0; i<m; ++i) { // "for each row"
-        int row_start = csr_row_ptr[i];
-        int row_end = csr_row_ptr[i+1];
-        int c = 0;
-        // Copy data from CSR arrays to ELL arrays
-        for (int j=row_start; j<row_end; ++j) {
-            int ell_dest_index = i*max_row_length + c; // destination_index = row_index * max_row_length + col_index
-            (*ell_col_ind)[ell_dest_index] = csr_col_ind[j];
-            (*ell_vals)[ell_dest_index] = csr_vals[j];
-            c++;
-        }
-        // Moved padding initialization above loop to -1/0.0 values.
-    }
-        // COMPLETE THIS FUNCTION
-}
-
-
-
-// Code from the third homework for cpu calculation of CSR and COO
-void spmv_coo_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals, 
-              int m, int n, int nnz, double* vector_x, double *res, 
-              omp_lock_t* writelock)
-{
-    #pragma omp parallel for
-    for (int i=0; i<m; i++) {
-        res[i] = 0.0;
-    }
-
-    // SpMV Calculation (parallelizable)
-    // each thread processes a section of non-zero elts
-    #pragma omp parallel for
-    for (int i=0; i<nnz; i++) {
-        // 1-based to 0-based errors my gosh
-        int row = row_ind[i]-1;
-        int col = col_ind[i]-1;
-        // MUST PREVENT RACE CONDITION updating res[row]
-        // Attomic version first draft (less complex/less efficient)
-        // #pragma omp atomic
-        // res[row] += vals[i] * vector_x[col];
-        omp_set_lock(&(writelock[row]));
-        res[row] += vals[i] * vector_x[col];
-        omp_unset_lock(&(writelock[row]));
-    }
-}
-
-void spmv_coo_ser_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals, 
-                  int m, int n, int nnz, double* vector_x, double *res)
-{
-    // Serial version for COO SpMV
-    // Initialize result vector to zero
-    for (int i=0; i<m; i++) {
-        res[i] = 0.0;
-    }
-    // Cacluate SpMV
-    for (int i=0; i<nnz; i++) {
-        int row = row_ind[i]-1;
-        int col = col_ind[i]-1;
-        res[row] += vals[i] * vector_x[col];
-    }
-}
-
-/* SpMV function for CSR stored sparse matrix
- */
-void spmv_ser_cpu(unsigned int* csr_row_ptr, unsigned int* csr_col_ind, 
-              double* csr_vals, int m, int n, int nnz, 
-              double* vector_x, double *res)
-{
-    // Serial vereion for SpMV CSR format
-    for (int i = 0; i < m; i++) {
-        double sum = 0.0;
-        for (int j = csr_row_ptr[i]; j<csr_row_ptr[i+1]; j++) {
-            sum += csr_vals[j] * vector_x[csr_col_ind[j]];
-        }
-        res[i] = sum;
-    }
-}
 

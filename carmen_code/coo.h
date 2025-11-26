@@ -1,6 +1,7 @@
 #ifndef COO_H
 #define COO_H
 
+#pragma once
 
 extern "C" {
   #include "mmio.h"

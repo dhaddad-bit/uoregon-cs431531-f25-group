@@ -11,4 +11,5 @@ void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
                         unsigned int** ell_col_ind, double** ell_vals, 
                         int* n_new);
 
+                        
 #endif
