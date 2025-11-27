@@ -19,6 +19,64 @@
 #define SPMV_CSR_SER     6
 #define STORE_TIME       7
 
+// Prefix sum parallel from homework 2 but addapted for non power of 2
+void parallel_prefix_sum(unsigned int* input, unsigned int* output, int n) {
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int nthreads = omp_get_num_threads();
+        // Calculate chunk size for thread
+        int chunk = n / nthreads;
+        int remainder = n % nthreads;
+        int start = tid*chunk + (tid < remainder? tid : remainder); //stack overflow
+        int end = start + chunk + (tid < remainder ? 1 : 0);
+        // prefix sum tutorial from youtube + slides 
+        // Local sum
+        unsigned int local_sum = 0;
+        for (int i=start; i<end; i++) {
+            local_sum += input[i];
+        }
+
+        static unsigned int* offsets = NULL;
+        #pragma omp single
+        {
+            if (offsets == NULL) {
+                offsets = (unsigned int*) malloc(sizeof(unsigned int) * (nthreads + 1));
+            }
+            offsets[0] = 0;
+        }
+
+        if (offsets!=NULL) offsets[tid+1] = local_sum;
+
+        #pragma omp barrier
+
+        #pragma omp single
+        {
+            unsigned int acc = 0;
+            for (int i=0; i<nthreads; i++) {
+                unsigned int tmp = offsets[i+1];
+                offsets[i] = acc;
+                acc += tmp;
+                offsets[i+1] = acc;
+            }
+        }
+        #pragma omp barrier
+
+        unsigned int thread_offset = offsets[tid];
+        unsigned int running_sum = thread_offset;
+        for (int i= start; i<end; i++) {
+            unsigned int val = input[i];
+            output[i] = running_sum;
+            running_sum += val;
+        }
+        
+        #pragma omp single
+        {
+            output [n] = offsets[nthreads];
+        }
+    }
+}
+
 
 int main(int argc, char** argv)
 {
@@ -367,15 +425,7 @@ void convert_coo_to_csr(int* row_ind, int* col_ind, double* val,
         row_counts[row_ind[i]-1]++;
     }
 
-    // Parallel Prefix Sum (/hw2) TODO!!!!!! 3part scan FIXME
-    // row counts to row_ptr
-    // (*csr_row_ptr)[i] = start index in col_ind/vals arrays for i-th row.
-    unsigned int sum = 0;
-    for (int i=0; i<m; i++) {
-        (*csr_row_ptr)[i] = sum;
-        sum += row_counts[i]; 
-    }
-    (*csr_row_ptr)[m] = sum; // last element is this nnz?
+    parallel_prefix_sum(row_counts, *csr_row_ptr, m);
 
     // CSR Column Values, from COO col_ind/vals arrays
     #pragma omp prallel for
@@ -472,16 +522,19 @@ void spmv(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
           double* csr_vals, int m, int n, int nnz, 
           double* vector_x, double *res)
 {
-    // "embarassingly parallel" problem for each row (individual dot product)
-    #pragma omp parallel for
-    for(int i=0; i<m; i++) {
-        res[i] = 0.0; // initialize result vector
-        double sum = 0.0;
-        for (int j=csr_row_ptr[i]; j<csr_row_ptr[i+1]; j++) {
-            int col = csr_col_ind[j];
-            sum += csr_vals[j] * vector_x[col];
+    // first initialize res to 0
+    #pragma omp parallel for schedule(static)
+    for(int i = 0; i < m; i++) {
+        res[i] = 0.0;
+    }
+    // calculate spmv
+    #pragma omp parallel for schedule(static)
+    for (unsigned int i=0; i<m; i++) {
+        unsigned int row_begin = csr_row_ptr[i];
+        unsigned int row_end = csr_row_ptr[i + 1];
+        for (unsigned int j=row_begin; j<row_end; j++) {
+            res[i] += csr_vals[j] * vector_x[csr_col_ind[j]];
         }
-        res[i] = sum;
     }
 }
 

@@ -1,0 +1,42 @@
+=================================================
+  Running Array Task ID: 4
+  Threads: 16
+=================================================
+-----------------------------------------------------
+Matrix name:     cant/cant.mtx
+Matrix size:     62451 x 62451 => 2034917
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    1
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: cant/cant.mtx ... file loaded.
+Expanding symmetric matrix ... done
+  Total # of non-zeros is 4007383
+Converting COO to CSR...done
+Vector file name: cant/b.mtx ... file loaded
+Calculating COO SpMV ... done
+Calculating CSR SpMV ... done
+Calculating COO SpMV serial ... done
+Calculating CSR SpMV ... done
+Result file name: output/result_cpu_16.mtx ... file saved
+Module		Time
+Load		0.714011
+Convert		0.009434
+Lock Init	0.000323
+COO SpMV	0.487430
+CSR SpMV	0.103305
+COO SpMV Serial	1.503162
+CSR SpMV Serial	1.581938
+Store		0.027245
+-------------------------------------------------
+Done.
