@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=test_sellc
+#SBATCH --output=test_sellc.out
+#SBATCH --error=test_sellc.err
+
+#SBATCH --partition=gpu
+#SBATCH --gpus=1
+#SBATCH --time=00:05:00
+
+module load cuda
+
+./test_sellc

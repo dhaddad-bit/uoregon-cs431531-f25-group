@@ -1,7 +1,7 @@
 // This will run on the CPU
 #include <vector>
 // #include <numeric>
-/#include <algorithm>
+#include <algorithm>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <cassert>
