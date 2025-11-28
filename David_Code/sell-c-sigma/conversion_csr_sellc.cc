@@ -1,7 +1,7 @@
 // This will run on the CPU
 #include <vector>
 // #include <numeric>
-// #include <algorithm>
+/#include <algorithm>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <cassert>
@@ -31,7 +31,17 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
         * sell_col_ind: SELL-C colunmn indices array
         * sell_vals: SELL-C values array
  */
-void convert_csr_to_sell_c(int m, const unsigned int* csr_row_ptr, const unsigned int* csr_col_ind, const double* csr_vals, int SLICE_THICKNESS, int* m_padded, int* total_nnz, unsigned int** sell_slice_ptr, unsigned int** sell_col_ind, double** sell_vals)
+extern "C" void convert_csr_to_sell_c(
+    int m, 
+    const unsigned int* csr_row_ptr, 
+    const unsigned int* csr_col_ind, 
+    const double* csr_vals, 
+    int SLICE_THICKNESS, 
+    int* m_padded, 
+    int* total_nnz, 
+    unsigned int** sell_slice_ptr, 
+    unsigned int** sell_col_ind, 
+    double** sell_vals)
 {
     int num_slices = (m + SLICE_THICKNESS -1) / SLICE_THICKNESS;
     *m_padded = num_slices * SLICE_THICKNESS;
@@ -53,7 +63,7 @@ void convert_csr_to_sell_c(int m, const unsigned int* csr_row_ptr, const unsigne
     assert(*sell_slice_ptr);
 
     unsigned int padded_nnz = 0;
-    for (int s=0; s<num_slices, s++) {
+    for (int s=0; s<num_slices; s++) {
         (*sell_slice_ptr)[s] = padded_nnz;
         padded_nnz += slice_lengths[s] * SLICE_THICKNESS;
     }
