@@ -1,9 +1,12 @@
 #ifndef CSR_H
 #define CSR_H
 
+
+
 extern "C" {
   #include "mmio.h"
   #include "common.h"
+  #include "coo.h"
 }
 
 

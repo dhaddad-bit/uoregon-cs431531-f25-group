@@ -1,7 +1,7 @@
 #include <stdio.h>
 //#include <stdlib.h>
 #include <cstdlib>
-
+#include <cstring>
 #include <assert.h>
 #include <omp.h>
 #include <math.h>
@@ -12,6 +12,7 @@
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
+#define MAX_ITER 10
 
 #define NUM_TIMERS       7
 #define LOAD_TIME        0
@@ -176,7 +177,7 @@ int main(int argc, char** argv)
     fprintf(stdout, "Calculating CPU CSR SpMV ... ");
     t0 = ReadTSC();
     for(unsigned int i = 0; i < MAX_ITER; i++) {
-        spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
+        csr_spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
     }
     timer[SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
     fprintf(stdout, "done\n");

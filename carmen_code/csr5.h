@@ -4,6 +4,7 @@
 extern "C" {
   #include "mmio.h"
   #include "common.h"
+  #include "ellpack.h"
 }
 
 //loading csr5

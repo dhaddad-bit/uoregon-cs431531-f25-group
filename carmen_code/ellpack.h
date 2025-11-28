@@ -4,6 +4,7 @@
 extern "C" {
   #include "mmio.h"
   #include "common.h"
+  #include "csr.h"
 }
 
 void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,

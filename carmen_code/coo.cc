@@ -1,4 +1,5 @@
 #include "coo.h"
+#include <stdio.h>
 
 
 // Code from the third homework for cpu calculation of CSR and COO

@@ -2,11 +2,16 @@
 #define COO_H
 
 #pragma once
+#include <stdio.h>
+#include <cstring>
+#include <string.h>
+#include <omp.h>
+#include <assert.h>
+
 
 extern "C" {
   #include "mmio.h"
   #include "common.h"
-  #include <omp.h>
 }
 
 
