@@ -20,6 +20,7 @@ void convert_csr_to_csr5(
     int* num_tiles,
     double** h_csr5_val,
     int** h_csr5_col_idx,
+    int** h_csr5_row_idx, // Row versioning of CSR5 to test what's wrong with my computation logic,, i rushed it at 2am and it doesn't work
     int** h_csr5_tile_ptr,
     uint32_t** h_csr5_tile_desc
 );
@@ -30,6 +31,7 @@ void spmv_gpu_csr5(
     int num_tiles,
     double* d_val,
     int* d_col_idx,
+    int* d_row_idx, // Row versioning of CSR5
     int* d_tile_ptr,
     uint32_t* d_tile_desc,
     double* d_x,

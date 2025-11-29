@@ -368,19 +368,21 @@ int main(int argc, char** argv) {
     int csr5_num_tiles;
     double *h_csr5_vals = NULL;
     int* h_csr5_col_idx = NULL;
+    int* h_csr5_row_idx = NULL;
     int* h_csr5_tile_ptr = NULL;
     unsigned int* h_csr5_tile_desc = NULL;
 
     // Host Converesion
     t0 = ReadTSC();
     convert_csr_to_csr5(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals, 
-                        &csr5_num_tiles, &h_csr5_vals, &h_csr5_col_idx,
-                        &h_csr5_tile_ptr, &h_csr5_tile_desc);
+                        &csr5_num_tiles, &h_csr5_vals, &h_csr5_col_idx, 
+                        &h_csr5_row_idx, &h_csr5_tile_ptr, &h_csr5_tile_desc);
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation
     double* d_csr5_vals = NULL;
     int* d_csr5_col_idx = NULL;
+    int* d_csr5_row_idx = NULL;
     int* d_csr5_tile_ptr = NULL;
     unsigned int* d_csr5_tile_desc = NULL;
     // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
@@ -391,6 +393,9 @@ int main(int argc, char** argv) {
     // Column Indices
     cudaMalloc((void**)&d_csr5_col_idx, csr5_capacity * sizeof(int));
     cudaMemcpy(d_csr5_col_idx, h_csr5_col_idx, csr5_capacity * sizeof(int), cudaMemcpyHostToDevice);
+    // Row Indices
+    cudaMalloc((void**)&d_csr5_row_idx, csr5_capacity * sizeof(int));
+    cudaMemcpy(d_csr5_row_idx, h_csr5_row_idx, csr5_capacity * sizeof(int), cudaMemcpyHostToDevice);
     // Tile Pointers
     cudaMalloc((void**)&d_csr5_tile_ptr, (csr5_num_tiles + 1) * sizeof(int));
     cudaMemcpy(d_csr5_tile_ptr, h_csr5_tile_ptr, (csr5_num_tiles + 1) * sizeof(int), cudaMemcpyHostToDevice);
@@ -401,8 +406,9 @@ int main(int argc, char** argv) {
     // Reusing dx and db from previous steps
     t0 = ReadTSC();
     for (int i=0; i<MAX_ITER; i++) {
-        spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, d_csr5_col_idx,
-                      d_csr5_tile_ptr, d_csr5_tile_desc, dx, db);
+        spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, 
+                      d_csr5_col_idx, d_csr5_row_idx, d_csr5_tile_ptr, 
+                      d_csr5_tile_desc, dx, db);
     }
     timer[GPU_CSR5_TIME] += ElapsedTime(ReadTSC() - t0);
 
@@ -419,10 +425,12 @@ int main(int argc, char** argv) {
     // Cleanup for CSR5
     cudaFree(d_csr5_vals);
     cudaFree(d_csr5_col_idx);
+    cudaFree(d_csr5_row_idx);
     cudaFree(d_csr5_tile_ptr);
     cudaFree(d_csr5_tile_desc);
     free(h_csr5_vals);
     free(h_csr5_col_idx);
+    free(h_csr5_row_idx);
     free(h_csr5_tile_ptr);
     free(h_csr5_tile_desc);
 

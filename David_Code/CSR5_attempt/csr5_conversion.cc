@@ -40,6 +40,7 @@ extern "C" void convert_csr_to_csr5(
     int* num_tiles,
     double** h_csr5_val,
     int** h_csr5_col_idx,
+    int** h_csr5_row_idx, // Row Versioning
     int** h_csr5_tile_ptr,
     uint32_t** h_csr5_tile_desc
 ) {
@@ -53,6 +54,7 @@ extern "C" void convert_csr_to_csr5(
     int capacity = (*num_tiles *(OMEGA * SIGMA));
     double *csr5_val = (double*) calloc (capacity, sizeof(double)); 
     int* csr5_col_idx =(int*) calloc (capacity, sizeof(int));
+    int* csr5_row_idx =(int*) calloc (capacity, sizeof(int));
     int* tile_ptr = (int*) malloc((num_tiles_local +1) * sizeof(int));
     unsigned int* tile_desc = (unsigned int*) calloc (num_tiles_local * OMEGA, sizeof(unsigned int));
 
@@ -82,13 +84,18 @@ extern "C" void convert_csr_to_csr5(
                 if (current_idx < nnz) {
                     csr5_val[dest_idx] = h_val[current_idx];
                     csr5_col_idx[dest_idx] = h_col_idx[current_idx];
-
-                    // Set Bit Flag
+                    // Row Versioning
                     int r = binary_search(h_row_ptr, current_idx, m);
-                    if (h_row_ptr[r] == current_idx) {
-                        // Check if this is the first element of a row
-                        bit_flag[i * SIGMA + j] = 1;
-                    }
+                    csr5_row_idx[dest_idx] = r;
+
+                    // // Set Bit Flag
+                    // int r = binary_search(h_row_ptr, current_idx, m);
+                    // if (h_row_ptr[r] == current_idx) {
+                    //     // Check if this is the first element of a row
+                    //     bit_flag[i * SIGMA + j] = 1;
+                    // }
+                } else {
+                    csr5_row_idx[dest_idx] = -1; // Row Versioning: Mark as invalid
                 }
             }
         }
@@ -156,6 +163,7 @@ extern "C" void convert_csr_to_csr5(
     // Assign the outputs to pointers
     *h_csr5_val = csr5_val;
     *h_csr5_col_idx = csr5_col_idx;
+    *h_csr5_row_idx = csr5_row_idx;
     *h_csr5_tile_ptr = tile_ptr;
     *h_csr5_tile_desc = tile_desc;
 }

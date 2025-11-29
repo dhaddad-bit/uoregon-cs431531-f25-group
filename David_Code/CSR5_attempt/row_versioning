@@ -1,0 +1,6 @@
+Feature,Original Paper Implementation," ""Naive"" Implementation"
+Memory Layout,Tiled & Transposed. (Coalesced access),Tiled & Transposed. (Coalesced access)
+Row Indexing,Implicit. Calculated via bit_flag + tile_ptr.,Explicit. We store row_idx[] for every element.
+Summation,Segmented Scan. Complex warp shuffles.,"Atomic Add. atomicAdd(&y[row], val)."
+Overhead,Low memory usage (compressed metadata).,Higher memory usage (we store a full int for every non-zero).
+Performance,Extremely fast (register-only math).,"Fast (coalesced reads), but slower writes (atomics clash)."
