@@ -4,6 +4,8 @@ CC = gcc
 CPP = g++
 NVCC = nvcc
 
+# Specify subdirectory to search for headers and source files
+VPATH = helpers:CSR5_attempt:include
 # --- Flags ---
 # C compilation flags
 CFLAGS = -O3 -fopenmp -lm -std=c11
@@ -16,7 +18,7 @@ NVCCFLAGS = -O3 -gencode arch=compute_80,code=sm_80 -std=c++11
 # --- Includes and Libs ---
 # Use the environment variable CUDA_HOME provided by the module
 CUDA_PATH ?= $(CUDA_HOME)
-NVCCINC = -I$(CUDA_PATH)/include -I$(CUDA_PATH)/samples/common/inc
+NVCCINC = -I$(CUDA_PATH)/include -I$(CUDA_PATH)/samples/common/inc -Ihelpers -ICSR5_attempt
 LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lm -fopenmp
 
 # --- Files ---
@@ -24,8 +26,8 @@ EXEC = spmv
 
 # Note: We now look for .cc files for main
 C_SRC = common.c mmio.c
-CC_SRC = $(wildcard *.cc)
-CU_SRC = spmv.cu
+CC_SRC = main.cc csr5_conversion.cc
+CU_SRC = spmv.cu csr5_spmv.cu
 
 # Generate object file names
 C_OBJS = $(C_SRC:.c=.o)

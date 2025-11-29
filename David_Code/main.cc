@@ -12,12 +12,13 @@
 #include "main.h"
 #include "spmv.h"
 #include "common.h"
+#include "csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
 #define MAX_ITER 100
 
-#define NUM_TIMERS       8
+#define NUM_TIMERS       9
 #define LOAD_TIME        0
 #define CONVERT_TIME     1
 #define SPMV_TIME        2
@@ -25,7 +26,8 @@
 #define GPU_SPMV_TIME    5
 #define GPU_ELL_TIME     3
 #define STORE_TIME       6
-#define GPU_SELL_C_TIME   7
+#define GPU_SELL_C_TIME  7
+#define GPU_CSR5_TIME    8
 
 
 // --- Sell-C-sigma conversion function --- 
@@ -205,7 +207,9 @@ int main(int argc, char** argv) {
     assert(n == vector_size);
     fprintf(stdout, "file loaded\n");
 
-    // Calculate CPU SPMV
+    // ==========================================
+    // Calculate CPU SPMV (benchmark/correctness))
+    // ==========================================
     double* bb = (double*) malloc(sizeof(double) * m);
     assert(bb);
     fprintf(stdout, "Calculating CPU CSR SpMV ... ");
@@ -216,7 +220,9 @@ int main(int argc, char** argv) {
     timer[SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
     fprintf(stdout, "done\n");
 
+    // ==========================================
     // Execute SPMV
+    // ==========================================
     fprintf(stdout, "Executing GPU CSR SpMV ... \n");
     unsigned int* drp; // row pointer on GPU
     unsigned int* dci; // col index on GPU
@@ -252,7 +258,9 @@ int main(int argc, char** argv) {
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
 
+    // ==========================================
     // Execute ELL SPMV
+    // ==========================================
     fprintf(stdout, "Executing GPU ELL SpMV ... \n");
     unsigned int* dec; // row pointer on GPU
     double* dev; // col index on GPU
@@ -295,7 +303,9 @@ int main(int argc, char** argv) {
 
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
+    // ==========================================
     // Execute SELL-C-sigma SPMV
+    // ==========================================
     fprintf(stdout, "Executing GPU SELL-C-Sigma SpMV ... \n");
     // Parameterization for SELL-C (not sigma yet TODO)
     int SLICE_THICKNESS = 32;
@@ -349,6 +359,74 @@ int main(int argc, char** argv) {
     free(h_sell_slice_ptr);
     free(h_sell_col_ind);
     free(h_sell_vals);
+
+
+    // ==========================================
+    // Execute CSR5 SPMV
+    // ==========================================
+    fprintf(stdout, "Executing GPU CSR5 SpMV ... \n");
+    int csr5_num_tiles;
+    double *h_csr5_vals = NULL;
+    int* h_csr5_col_idx = NULL;
+    int* h_csr5_tile_ptr = NULL;
+    unsigned int* h_csr5_tile_desc = NULL;
+
+    // Host Converesion
+    t0 = ReadTSC();
+    convert_csr_to_csr5(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals, 
+                        &csr5_num_tiles, &h_csr5_vals, &h_csr5_col_idx,
+                        &h_csr5_tile_ptr, &h_csr5_tile_desc);
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
+
+    // GPU allocation
+    double* d_csr5_vals = NULL;
+    int* d_csr5_col_idx = NULL;
+    int* d_csr5_tile_ptr = NULL;
+    unsigned int* d_csr5_tile_desc = NULL;
+    // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
+    int csr5_capacity = csr5_num_tiles * 32 * 16;
+    // Values
+    cudaMalloc((void**)&d_csr5_vals, csr5_capacity * sizeof(double));
+    cudaMemcpy(d_csr5_vals, h_csr5_vals, csr5_capacity * sizeof(double), cudaMemcpyHostToDevice);
+    // Column Indices
+    cudaMalloc((void**)&d_csr5_col_idx, csr5_capacity * sizeof(int));
+    cudaMemcpy(d_csr5_col_idx, h_csr5_col_idx, csr5_capacity * sizeof(int), cudaMemcpyHostToDevice);
+    // Tile Pointers
+    cudaMalloc((void**)&d_csr5_tile_ptr, (csr5_num_tiles + 1) * sizeof(int));
+    cudaMemcpy(d_csr5_tile_ptr, h_csr5_tile_ptr, (csr5_num_tiles + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    // Tile Descriptors
+    cudaMalloc((void**)&d_csr5_tile_desc, csr5_num_tiles * 32 * sizeof(unsigned int));
+    cudaMemcpy(d_csr5_tile_desc, h_csr5_tile_desc, csr5_num_tiles * 32 * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    // Run the Benchmark loop
+    // Reusing dx and db from previous steps
+    t0 = ReadTSC();
+    for (int i=0; i<MAX_ITER; i++) {
+        spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, d_csr5_col_idx,
+                      d_csr5_tile_ptr, d_csr5_tile_desc, dx, db);
+    }
+    timer[GPU_CSR5_TIME] += ElapsedTime(ReadTSC() - t0);
+
+    // Verify correctness
+    // Copy back to 'be' array (re-using for now too tired TODO)
+    get_result_gpu(db, be, m);
+    double csr5_diff = 0.0;
+    for (int i=0; i<m; i++) {
+        double err = be[i] - bb[i];
+        csr5_diff += err * err;
+    }
+    csr5_diff = sqrt(csr5_diff);
+    fprintf(stdout, "2-Norm difference between CSR and CSR5 results: %e\n", csr5_diff);
+    // Cleanup for CSR5
+    cudaFree(d_csr5_vals);
+    cudaFree(d_csr5_col_idx);
+    cudaFree(d_csr5_tile_ptr);
+    cudaFree(d_csr5_tile_desc);
+    free(h_csr5_vals);
+    free(h_csr5_col_idx);
+    free(h_csr5_tile_ptr);
+    free(h_csr5_tile_desc);
+
+
 
 
     // Calculate correctness
@@ -714,6 +792,10 @@ void print_time(double timer[])
     fprintf(stdout, "GPU SELL-C SpMV\t");
     fprintf(stdout, "%f\n", timer[GPU_SELL_C_TIME]);
     // ------------------------------- 
+    // --- CSR5 specific timing ---
+    fprintf(stdout, "GPU CSR5 SpMV\t");
+    fprintf(stdout, "%f\n", timer[GPU_CSR5_TIME]);
+    // ---------------------------
     fprintf(stdout, "Store\t\t");
     fprintf(stdout, "%f\n", timer[STORE_TIME]);
 }
