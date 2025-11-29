@@ -49,7 +49,7 @@ extern "C" void convert_csr_to_sell_c_sigma(
     // Calculate lengths using a lambda function to avoid complications and sort using std::sort
     // Cite: stack overflow
     std::sort(*sigma_permutation, *sigma_permutation + m,
-              [&csr_row_ptr](int a, int b) {
+              [csr_row_ptr](int a, int b) {
                     int len_a = csr_row_ptr[a+1] - csr_row_ptr[a];
                     int len_b = csr_row_ptr[b+1] - csr_row_ptr[b];
                     return len_a > len_b;
@@ -322,13 +322,13 @@ int main(int argc, char** argv) {
     CopyData(h_sell_vals, total_nnz_sell, sizeof(double), &d_sell_vals);
     // Run SPMV Benchmark Loop
     t0 = ReadTSC();
-    spmv_gpu_sellc(m_padded_sell, num_slices, SLICE_THICKNESS, 
+    spmv_gpu_sellc(m, num_slices, SLICE_THICKNESS, 
                     d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
                     dx, db);
     timer[GPU_SELL_C_TIME] += ElapsedTime(ReadTSC() - t0);
 
     double* h_y_sigma = (double*) malloc(sizeof(double) * m_padded_sell);
-    cudaMemcpy(h_y_sigma, db, m_padded_sell * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_y_sigma, db, m * sizeof(double), cudaMemcpyDeviceToHost);
     double sigma_diff = 0.0;
     for (int i=0; i<m; i++) {
         int original_idx = h_sigma_permutation[i];
