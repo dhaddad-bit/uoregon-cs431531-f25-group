@@ -1,0 +1,5 @@
+func,time
+csr_cpu,0.00993582
+csr_gpu,0.00547186
+ell_std,0.00544514
+ell_sig,0.00208568

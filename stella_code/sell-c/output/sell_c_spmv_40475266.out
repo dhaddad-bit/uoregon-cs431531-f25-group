@@ -1,0 +1,66 @@
+-----------------------------------------------------
+Matrix name:     cant/cant.mtx
+Matrix size:     62451 x 62451 => 2034917
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    1
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: cant/cant.mtx ... file loaded.
+Expanding symmetric matrix ... done
+  Total # of non-zeros is 4007383
+Converting COO to CSR...done
+Vector file name: cant/b.mtx ... file loaded
+Executing GPU CSR SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 1.605285
+  Pinned Device to Host bandwidth (GB/s): 4.906823
+  Pinned Device to Host bandwidth (GB/s): 5.709108
+  Pinned Device to Host bandwidth (GB/s): 7.302502
+  Running CSR with 32 threads...
+  Exec time (per itr): 0.00044284 s
+  Running CSR with 64 threads...
+  Exec time (per itr): 0.00039937 s
+  Running CSR with 128 threads...
+  Exec time (per itr): 0.00063741 s
+  Running CSR with 256 threads...
+  Exec time (per itr): 0.00122566 s
+  Pinned Host to Device bandwidth (GB/s): 1.112098
+Executing GPU ELL SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 3.935809
+  Pinned Device to Host bandwidth (GB/s): 10.868314
+  Running ELL with 32 threads...
+  Exec time (per itr): 0.00050324 s
+  Running ELL with 64 threads...
+  Exec time (per itr): 0.00044146 s
+  Running ELL with 128 threads...
+  Exec time (per itr): 0.00059073 s
+  Running ELL with 256 threads...
+  Exec time (per itr): 0.00114553 s
+  Pinned Host to Device bandwidth (GB/s): 1.095478
+Executing GPU SELL-C SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 0.206187
+  Pinned Device to Host bandwidth (GB/s): 4.595657
+  Pinned Device to Host bandwidth (GB/s): 5.003690
+  Exec time (per itr): 0.00029110 s
+  Pinned Host to Device bandwidth (GB/s): 4.835166
+Calculating CPU CSR SpMV ... done
+2-Norm between CPU and GPU answers: 1.195589e-10
+Result file name: ./test.mtx ... file saved
+Module		Time
+Load		0.593472
+Convert		0.039508
+CPU SpMV	0.018878
+GPU Alloc	0.228490
+GPU SpMV	0.039953
+GPU ELL SpMV	0.044162
+GPU SELL-C SpMV	0.029166
+Store		0.026951
