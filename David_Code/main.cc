@@ -1,18 +1,23 @@
 #include <stdio.h>
-//#include <stdlib.h>
 #include <cstdlib>
 #include <string.h>
 #include <assert.h>
 #include <omp.h>
 #include <math.h>
 
+#include <algorithm>
+#include <vector>
+#include <cuda_runtime.h>
+
 #include "main.h"
 #include "spmv.h"
+#include "common.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
+#define MAX_ITER 100
 
-#define NUM_TIMERS       7
+#define NUM_TIMERS       8
 #define LOAD_TIME        0
 #define CONVERT_TIME     1
 #define SPMV_TIME        2
@@ -20,8 +25,76 @@
 #define GPU_SPMV_TIME    5
 #define GPU_ELL_TIME     3
 #define STORE_TIME       6
+#define GPU_SELLC_TIME   7
 
+// --- Sell-C conversion function --- 
+extern "C" void convert_csr_to_sell_c(
+    int m, 
+    const unsigned int* csr_row_ptr, 
+    const unsigned int* csr_col_ind, 
+    const double* csr_vals, 
+    int SLICE_THICKNESS, 
+    int* m_padded, 
+    int* total_nnz, 
+    unsigned int** sell_slice_ptr, 
+    unsigned int** sell_col_ind, 
+    double** sell_vals)
+{
+    int num_slices = (m + SLICE_THICKNESS -1) / SLICE_THICKNESS;
+    *m_padded = num_slices * SLICE_THICKNESS;
+    std::vector<unsigned int> slice_lengths(num_slices);
+    for (int s = 0; s < num_slices; s++) {
+        unsigned int max_length = 0;
+        for (int i=0; i<SLICE_THICKNESS; i++) {
+            int row = s * SLICE_THICKNESS + i;
+            if (row < m) { // we are within original matrix (unpadded bounds)
+                unsigned int row_length = csr_row_ptr[row+1] - csr_row_ptr[row];
+                max_length = std::max(max_length, row_length);
+    
+            }
+        }
+        slice_lengths[s] = max_length;
+    }
+    // Prefix sum on slice lengths to get the slice_ptr array
+    *sell_slice_ptr = (unsigned int*)malloc((sizeof(unsigned int) * (num_slices + 1)));
+    assert(*sell_slice_ptr);
 
+    unsigned int padded_nnz = 0;
+    for (int s=0; s<num_slices; s++) {
+        (*sell_slice_ptr)[s] = padded_nnz;
+        padded_nnz += slice_lengths[s] * SLICE_THICKNESS;
+    }
+    (*sell_slice_ptr)[num_slices] = padded_nnz;
+    *total_nnz = padded_nnz;
+    // Allocate and fill arrays for SELL-C format
+    *sell_col_ind = (unsigned int*)calloc(*total_nnz, sizeof(unsigned int));
+    *sell_vals = (double*)calloc(*total_nnz, sizeof(double));
+    assert(*sell_col_ind);
+    assert(*sell_vals);
+
+    // Each slice gets iterated over
+    for (int s=0; s<num_slices; s++) {
+        unsigned int slice_start = (*sell_slice_ptr)[s];
+        unsigned int slice_max_length = slice_lengths[s];
+
+        // Iterate threads/rows within the slice
+        for (int i=0; i<SLICE_THICKNESS; i++) {
+            int row = s * SLICE_THICKNESS + i;
+            if (row < m) { // non padded rows
+                unsigned int csr_start = csr_row_ptr[row];
+                unsigned int csr_end = csr_row_ptr[row+1];
+                unsigned int row_length = csr_end - csr_start;
+            // Copy the data from CSR to SELL-C
+                for (unsigned int j=0; j<row_length; j++) {
+                    unsigned int sell_index = slice_start + j * SLICE_THICKNESS + i;
+                    (*sell_col_ind)[sell_index] = csr_col_ind[csr_start + j];
+                    (*sell_vals)[sell_index] = csr_vals[csr_start + j];
+                }
+            }
+            // Padding is already zeroed out by calloc
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -167,7 +240,45 @@ int main(int argc, char** argv)
     get_result_gpu(db, be, m);
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
-
+    // Execute SELL-C SPMV
+    fprintf(stdout, "Executing GPU SELL-C SpMV ... \n");
+    // Parameterization for SELL-C (not sigma yet TODO)
+    int SLICE_THICKNESS = 32;
+    int m_padded_sell = 0; int total_nnz_sell = 0;
+    unsigned int *h_sell_slice_ptr = NULL;
+    unsigned int *h_sell_col_ind = NULL;
+    double *h_sell_vals = NULL;
+    // Run converson on Host CPU
+    t0 = ReadTSC();
+    convert_csr_to_sell_c(
+        m, csr_row_ptr, csr_col_ind, csr_vals, SLICE_THICKNESS,
+        &m_padded_sell, &total_nnz_sell, &h_sell_slice_ptr,
+        &h_sell_col_ind, &h_sell_vals);
+    int num_slices = m_padded_sell / SLICE_THICKNESS;
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
+    // Allocate on GPU
+    unsigned int *d_sell_slice_ptr = NULL; 
+    unsigned int *d_sell_col_ind = NULL;
+    double *d_sell_vals = NULL;
+    CopyData(h_sell_slice_ptr, num_slices + 1, sizeof(unsigned int), &d_sell_slice_ptr);
+    CopyData(h_sell_col_ind, total_nnz_sell, sizeof(unsigned int), &d_sell_col_ind);
+    CopyData(h_sell_vals, total_nnz_sell, sizeof(double), &d_sell_vals);
+    // Run SPMV Benchmark Loop
+    t0 = ReadTSC();
+    for (int i = 0; i < 100; i++) {
+        spmv_gpu_sellc(m_padded_sell, num_slices, SLICE_THICKNESS, 
+                        d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
+                        dx, db);
+    }
+    timer[GPU_SELLC_TIME] += ElapsedTime(ReadTSC() - t0);
+    get_result_gpu(db, be, m);
+    // Free SELL-C specific memory
+    cudaFree(d_sell_slice_ptr);
+    cudaFree(d_sell_col_ind);
+    cudaFree(d_sell_vals);
+    free(h_sell_slice_ptr);
+    free(h_sell_col_ind);
+    free(h_sell_vals);
 
     // Calculate CPU SPMV
     double* bb = (double*) malloc(sizeof(double) * m);
