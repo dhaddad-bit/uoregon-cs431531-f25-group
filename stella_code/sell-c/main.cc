@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
@@ -162,11 +163,9 @@ int main(int argc, char** argv) {
     int index;
     char* ptr;
     const char sep = '/';
-    ptr = strchr(matrixName, sep);
-    if (ptr != NULL) {
-	    index = (int)(ptr - matrixName);
-    }else index = 0;
-    sprintf(outName, "../timing-out/%s-out.csv", matrixName + index + 1);
+    std::string outNamepp = matrixName;
+    index = outNamepp.find_last_of(sep);
+    sprintf(outName, "../timing-out/%s-out.csv", outNamepp.c_str() + index + 1);
     printf("Output file: '%s'\n", outName);
 	std::ofstream outFile(outName);
 	outFile << "func,time" << std::endl;
