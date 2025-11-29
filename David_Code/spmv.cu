@@ -16,6 +16,7 @@ inline void check_cuda(cudaError_t result, char const *const func, const char *c
 #include <cooperative_groups.h> 
 #include "spmv.h"
 
+#define MAX_ITER 100
 template <class T>
 __global__ void
 spmv_kernel_ell(unsigned int* col_ind, T* vals, int m, int n, int nnz, 
@@ -280,7 +281,6 @@ __global__ void spmv_sell_c_kernel(
     // 2. Which row within the slice is this thread handling?
     int i = threadIdx.x;
     int row = slice_id * SLICE_THICKNESS + i;
-    if (row >= m) return; // Boundary check for padded rows // IS THIS NECESSARY? TODO
     
     // 3. Determine the boundaries of the slice from slice pointer array
     unsigned int start = slice_ptr[slice_id];
@@ -295,11 +295,15 @@ __global__ void spmv_sell_c_kernel(
         // index = start + (j*SLICE_THICKNESS) + i
         unsigned int idx = start + (j * SLICE_THICKNESS) + i;
         unsigned int col = col_ind[idx];
-        double val = vals[idx];
-
-        sum += val * x[col];
+        if (col != (unsigned int)(-1)) {
+            // Valid entry
+            double val = vals[idx];
+            sum += val * x[col];
+        }
     }
-    y[row] = sum;
+    if (row < m) {
+        y[row] = sum;
+    }
 }
 
 // Wrapper function to call from main.cc (C-style linking needed for errors)
@@ -313,13 +317,39 @@ extern "C" void spmv_gpu_sellc(
     double* d_x,
     double* d_y
 ) {
-    // Launch a block per slice, with block size == slice thickness
+    // timers
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&stop));
+    float elapsedTime;
+
+    // GPU execution parameters
     dim3 block(SLICE_THICKNESS);
     dim3 grid(num_slices);
-    spmv_sell_c_kernel<<<grid, block>>>(m, num_slices, SLICE_THICKNESS, d_slice_ptr, d_col_ind, d_vals, d_x, d_y);
-    // Check for kernel launch errors
+    // Record start:
+    checkCudaErrors(cudaEventRecord(start, 0));
+    // Run max iterations
+    for(unsigned int i = 0; i < MAX_ITER; i++) {
+        cudaDeviceSynchronize();
+        spmv_sell_c_kernel<<<grid, block>>>(
+            m,
+            num_slices,
+            SLICE_THICKNESS,
+            d_slice_ptr,
+            d_col_ind,
+            d_vals,
+            d_x,
+            d_y
+        );
+    }
+    // Record Stop
+    checkCudaErrors(cudaEventRecord(stop, 0));
+    checkCudaErrors(cudaEventSynchronize(stop));
+    checkCudaErrors(cudaEventElapsedTime(&elapsedTime, start, stop));
+    printf("  Exec time (per itr): %0.8f s\n", (elapsedTime / 1e3 / MAX_ITER));
+
+    checkCudaErrors(cudaEventDestroy(start));
+    checkCudaErrors(cudaEventDestroy(stop));
     checkCudaErrors(cudaGetLastError());
-}
-
-
-// --- SELL-C-sigma SpMV kernel ---
+}  
