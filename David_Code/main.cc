@@ -29,6 +29,25 @@
 #define GPU_SELL_C_TIME  7
 #define GPU_CSR5_TIME    8
 
+double calc_diff(int m, const double* r1, const double* r2) {
+    double diff = 0.0;
+    for (int i=0; i<m; i++) {
+        double err = r1[i] - r2[i];
+        diff += err * err;
+    }
+    return sqrt(diff);
+}
+
+
+void log_csv(const char* name, int config, double time_s, double conv_s, int nnz, int m, int n, double err) {
+   // GFLOPS = (2 * nnz ops) / (time in seconds) / 10^9
+    double gflops = 2.0 * nnz / (time_s * 1e9);
+
+    // Effective Bandwidth (APproximation) THIS IS WHAT WE CARE ABOUT!
+    double bytes = (nnz * 12.0) + (m * 16.0) + (n * 8.0); // CSR: val (8 bytes) + col_idx (4 bytes) + row_ptr (4 bytes) + x (8 bytes) + y (8 bytes)
+    double gbps = bytes / (time_s * 1e9);
+    fprintf(stdout, "%s,%d,%.9f,%.9f,%.4f,%.4f,%e\n", name, config, time_s, conv_s, gflops, gbps, err);
+}
 
 // --- Sell-C-sigma conversion function --- 
 extern "C" void convert_csr_to_sell_c_sigma(
@@ -167,6 +186,7 @@ int main(int argc, char** argv) {
     int *row_ind;
     int *col_ind;
     double *val;
+    float time_ms; // Variable to capture kernel GPU time
     fprintf(stdout, "Matrix file name: %s ... ", matrixName);
     t0 = ReadTSC();
     ret = mm_read_mtx_crd(matrixName, &m, &n, &nnz, &row_ind, &col_ind, &val, 
@@ -237,17 +257,19 @@ int main(int argc, char** argv) {
     // Test different thread counts
     int thread_counts[] = {32, 64, 128, 256};
     int num_tests = 4;
-
+    
+    // Temp buffer for verification
+    double* h_check = (double*)malloc(sizeof(double) * m);
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
-        fprintf(stdout, "  Running CSR with %d threads...\n", threads);
-        t0 = ReadTSC();
-        spmv_gpu(drp, dci, dv, m, n, nnz, dx, db, threads);
-
+        spmv_gpu(drp, dci, dv, m, n, nnz, dx, db, threads, &time_ms);
+        // Verify and log
+        get_result_gpu(db, h_check, m);
+        double err = calc_diff(m, bb, h_check);
+        log_csv("CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+        fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
-        if (threads == 64) {
-            timer[GPU_SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
-        }
+        if (threads == 64) timer[GPU_SPMV_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
     };
 
     // copy data back from the GPU
@@ -271,13 +293,16 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
-        fprintf(stdout, "  Running ELL with %d threads...\n", threads);
-        t0 = ReadTSC();
-        spmv_gpu_ell(dec, dev, m, n_new, nnz, dx, db, threads);
+        spmv_gpu_ell(dec, dev, m, n_new, nnz, dx, db, threads, &time_ms);
+        // Verify and log
+        get_result_gpu(db, h_check, m);
+        double err = calc_diff(m, h_check, bb);
+        log_csv("ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
+        fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
         if (threads == 64) {
-            timer[GPU_ELL_TIME] += ElapsedTime(ReadTSC() - t0);
+            timer[GPU_ELL_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
         }
     }
 
@@ -331,27 +356,25 @@ int main(int argc, char** argv) {
     CopyData(h_sell_col_ind, total_nnz_sell, sizeof(unsigned int), &d_sell_col_ind);
     CopyData(h_sell_vals, total_nnz_sell, sizeof(double), &d_sell_vals);
     // Run SPMV Benchmark Loop
-    t0 = ReadTSC();
     spmv_gpu_sellc(m, num_slices, SLICE_THICKNESS, 
                     d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
-                    dx, db);
-    timer[GPU_SELL_C_TIME] += ElapsedTime(ReadTSC() - t0);
-
+                    dx, db, &time_ms);
+    timer[GPU_SELL_C_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
+    fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
+    // Unscramble and verify correctness
     double* h_y_sigma = (double*) malloc(sizeof(double) * m_padded_sell);
     cudaMemcpy(h_y_sigma, db, m * sizeof(double), cudaMemcpyDeviceToHost);
     double sigma_diff = 0.0;
     for (int i=0; i<m; i++) {
         int original_idx = h_sigma_permutation[i];
-        double err = h_y_sigma[i] - be[original_idx];
+        double err = h_y_sigma[i] - bb[original_idx];
         sigma_diff += err * err;
-    }
-    sigma_diff = sqrt(sigma_diff);
-    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
-    // copy data back from the GPU
-    for(int i=0; i<m; i++) {
-        int original_idx = h_sigma_permutation[i];
+        // Store unscrambled result for final save file
         be[original_idx] = h_y_sigma[i];
     }
+    log_csv("SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
+    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
+
     // Free SELL-C specific memory
     cudaFree(d_sell_slice_ptr);
     cudaFree(d_sell_col_ind);
@@ -404,23 +427,16 @@ int main(int argc, char** argv) {
     cudaMemcpy(d_csr5_tile_desc, h_csr5_tile_desc, csr5_num_tiles * 32 * sizeof(unsigned int), cudaMemcpyHostToDevice);
     // Run the Benchmark loop
     // Reusing dx and db from previous steps
-    t0 = ReadTSC();
-    for (int i=0; i<MAX_ITER; i++) {
-        spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, 
-                      d_csr5_col_idx, d_csr5_row_idx, d_csr5_tile_ptr, 
-                      d_csr5_tile_desc, dx, db);
-    }
-    timer[GPU_CSR5_TIME] += ElapsedTime(ReadTSC() - t0);
+    spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, 
+                  d_csr5_col_idx, d_csr5_row_idx, d_csr5_tile_ptr, 
+                  d_csr5_tile_desc, dx, db, &time_ms);
+    timer[GPU_CSR5_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
+    // Verify and log
+    get_result_gpu(db, h_check, m);
+    double csr5_diff = calc_diff(m, h_check, bb);
+    log_csv("CSR5", 32, time_ms / 1000.0, 0.0, nnz, m, n, csr5_diff);
+    fprintf(stdout, " CSR5 Time (ms): %f ms\n", time_ms);
 
-    // Verify correctness
-    // Copy back to 'be' array (re-using for now too tired TODO)
-    get_result_gpu(db, be, m);
-    double csr5_diff = 0.0;
-    for (int i=0; i<m; i++) {
-        double err = be[i] - bb[i];
-        csr5_diff += err * err;
-    }
-    csr5_diff = sqrt(csr5_diff);
     fprintf(stdout, "2-Norm difference between CSR and CSR5 results: %e\n", csr5_diff);
     // Cleanup for CSR5
     cudaFree(d_csr5_vals);
@@ -433,6 +449,8 @@ int main(int argc, char** argv) {
     free(h_csr5_row_idx);
     free(h_csr5_tile_ptr);
     free(h_csr5_tile_desc);
+    free(h_check);
+
 
 
 

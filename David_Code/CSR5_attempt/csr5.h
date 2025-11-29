@@ -35,7 +35,8 @@ void spmv_gpu_csr5(
     int* d_tile_ptr,
     uint32_t* d_tile_desc,
     double* d_x,
-    double* d_y
+    double* d_y,
+    float* time_ms
 );
 
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---

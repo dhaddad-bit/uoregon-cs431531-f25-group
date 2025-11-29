@@ -2,8 +2,10 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+#define MAX_ITER 100
+
 // Helper: to check for CUDA errors (My saving grace for debugging)
-#define checkCuda(val) check((val), #val, __FILE__, __LINE__)
+#define checkCudaErrors(val) check((val), #val, __FILE__, __LINE__)
 void check(cudaError_t result, char const* const func, const char* const file, int const line) {
     if (result) {
         fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\" \n",
@@ -92,21 +94,36 @@ extern "C" void spmv_gpu_csr5(
     int* d_tile_ptr,
     unsigned int* d_tile_desc,
     double* d_x,
-    double* d_y
+    double* d_y,
+    float* time_ms
 ) {
     dim3 block(CSR5_OMEGA);
     dim3 grid(num_tiles);
+
+    // timers
+    cudaEvent_t start, stop;
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&stop));
     // Reset the output vector since we do atomic adds
     // Reason: we may have multiple threads writing to the same output
     cudaMemset(d_y, 0, m *sizeof(double));
+    spmv_csr5_kernel<<<grid, block>>>(num_tiles, d_val, d_col_idx, d_row_idx, d_tile_ptr, d_tile_desc, d_x, d_y);
+    checkCudaErrors(cudaEventRecord(start, 0));
+    for(int i=0; i<MAX_ITER; i++) {
+        spmv_csr5_kernel<<<grid, block>>>(num_tiles, d_val, d_col_idx, d_row_idx, d_tile_ptr, d_tile_desc, d_x, d_y);
+    }
+    checkCudaErrors(cudaEventRecord(stop, 0));
+    checkCudaErrors(cudaEventSynchronize(stop));
+    float elapsedTime;
+    checkCudaErrors(cudaEventElapsedTime(&elapsedTime, start, stop));
+    *time_ms = elapsedTime / (float)MAX_ITER;
+
+    cudaMemset(d_y, 0, m *sizeof(double)); // reset output again after timing Final clean run for correctenss
+    spmv_csr5_kernel<<<grid, block>>>(num_tiles, d_val, d_col_idx, d_row_idx, d_tile_ptr, d_tile_desc, d_x, d_y);
     
-    spmv_csr5_kernel<<<grid, block>>>(
-        num_tiles, d_val, d_col_idx, d_row_idx, d_tile_ptr, d_tile_desc, d_x, d_y
-    );
-    // --- Timing Not working!!! --- 
-    cudaDeviceSynchronize();
-    // --------------------- 
-    checkCuda(cudaGetLastError());
+    checkCudaErrors(cudaEventDestroy(start));
+    checkCudaErrors(cudaEventDestroy(stop));
+    checkCudaErrors(cudaGetLastError());
 }
                                             
                                             
