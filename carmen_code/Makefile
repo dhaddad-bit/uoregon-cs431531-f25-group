@@ -11,9 +11,10 @@ NVCCFLAGS = -gencode arch=compute_80,code=sm_80 #--ptxas-options=-v
 NVCCINC += -I$(CUDA_INSTALL_PATH)/include 
 NVCCINC += -I$(TOOLKIT_INSTALL_PATH)/common/inc
 
-SRC  = $(notdir $(wildcard *.cc)) $(notdir $(wildcard *.cu)) $(notdir $(wildcard *.c))
+SRC = common.c mmio.c coo.cc csr.cc ellpack.cc csr5.cc spmv.cc main.cc
 
-OBJS = $(addsuffix .o, $(basename $(SRC)))
+OBJS = common.o mmio.o coo.o csr.o ellpack.o csr5.o spmv.o main.o
+
 EXEC = spmv
 
 all: ${EXEC}

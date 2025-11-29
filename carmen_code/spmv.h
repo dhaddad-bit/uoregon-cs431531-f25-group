@@ -1,8 +1,11 @@
 #ifndef SPMV_H
 #define SPMV_H
+
 extern "C" {
 #include "common.h"
 }
+
+#define MAX_ITER 20
 
 void spmv_gpu_ell(unsigned int* col_ind, double* vals, int m, int n, int nnz, 
                   double* x, double* b, unsigned int threads = 64);

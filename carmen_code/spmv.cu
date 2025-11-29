@@ -3,6 +3,7 @@
 #include <assert.h>
 
 // --- COMPILER CAN"T FIND <helper_cuda.h> which I was using for check_cuda()
+
 inline void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line)
 {
     if(result)

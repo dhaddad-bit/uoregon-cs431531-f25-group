@@ -16,4 +16,4 @@ module load cuda/12.4.1
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=28
 
-./spmv cant/cant.mtx cant/b.mtx ./test.mtx 
+compute-sanitizer --tool memcheck --log-file memcheck_${SLURM_JOB_ID}.log ./spmv cant/cant.mtx cant/b.mtx ./test.mtx 

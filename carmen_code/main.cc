@@ -6,13 +6,12 @@
 #include <omp.h>
 #include <math.h>
 
+#include "csr5.h"
 #include "main.h"
 #include "spmv.h"
-#include "csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
-#define MAX_ITER 10
 
 #define NUM_TIMERS       7
 #define LOAD_TIME        0
@@ -84,13 +83,20 @@ int main(int argc, char** argv)
     t0 = ReadTSC();
     convert_coo_to_csr(row_ind, col_ind, val, m, n, nnz,
                        &csr_row_ptr, &csr_col_ind, &csr_vals);
+
+
+    fprintf(stdout, "done\n");
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
+    //convert csr to csr5
+    fprintf(stdout, "Converting CSR to CSR5...");
+    unsigned int* 
+
+
     unsigned int* ell_col_ind = NULL;
     double* ell_vals = NULL;
     int n_new = 0;
-    convert_csr_to_ell(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz,
-                       &ell_col_ind, &ell_vals, &n_new);
-    fprintf(stdout, "done\n");
-    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
+    //convert_csr_to_ell(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz,
+      //                 &ell_col_ind, &ell_vals, &n_new);
 
     // Load the input vector x 
     char vectorName[MAX_FILENAME];
@@ -142,15 +148,15 @@ int main(int argc, char** argv)
 
 
     // Execute ELL SPMV
-    fprintf(stdout, "Executing GPU ELL SpMV ... \n");
+    //fprintf(stdout, "Executing GPU ELL SpMV ... \n");
     unsigned int* dec; // row pointer on GPU
     double* dev; // col index on GPU
     t0 = ReadTSC();
-    allocate_ell_gpu(ell_col_ind, ell_vals, m, n_new, nnz, x, &dec, &dev, &dx,
-                     &db);
-    timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
+    //allocate_ell_gpu(ell_col_ind, ell_vals, m, n_new, nnz, x, &dec, &dev, &dx,
+    //                 &db);
+    //timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
-    for (int i = 0; i < num_tests; i++) {
+    /*for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
         fprintf(stdout, "  Running ELL with %d threads...\n", threads);
         t0 = ReadTSC();
@@ -167,7 +173,7 @@ int main(int argc, char** argv)
     assert(be);
     t0 = ReadTSC();
     get_result_gpu(db, be, m);
-    timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
+    timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);*/
 
 
 
@@ -187,7 +193,7 @@ int main(int argc, char** argv)
     double* c = (double*) malloc(sizeof(double) * m);
     assert(c);
     for(int i = 0; i < m; i++) {
-        c[i] = be[i] - bb[i];
+        //c[i] = be[i] - bb[i];
     }
     double norm = dnrm2(m, c, 1);   
     printf("2-Norm between CPU and GPU answers: %e\n", norm);
@@ -198,7 +204,7 @@ int main(int argc, char** argv)
     strcpy(resName, argv[3]); 
     fprintf(stdout, "Result file name: %s ... ", resName);
     t0 = ReadTSC();
-    store_result(resName, be, m);
+    //store_result(resName, be, m);
     timer[STORE_TIME] += ElapsedTime(ReadTSC() - t0);
     fprintf(stdout, "file saved\n");
 
