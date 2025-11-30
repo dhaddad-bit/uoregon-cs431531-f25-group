@@ -12,7 +12,7 @@
 #include "main.h"
 #include "spmv.h"
 #include "common.h"
-#include "csr5.h"
+#include "csr5/csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
@@ -47,6 +47,24 @@ void log_csv(const char* name, int config, double time_s, double conv_s, int nnz
     double bytes = (nnz * 12.0) + (m * 16.0) + (n * 8.0); // CSR: val (8 bytes) + col_idx (4 bytes) + row_ptr (4 bytes) + x (8 bytes) + y (8 bytes)
     double gbps = bytes / (time_s * 1e9);
     fprintf(stdout, "%s,%d,%.9f,%.9f,%.4f,%.4f,%e\n", name, config, time_s, conv_s, gflops, gbps, err);
+}
+
+
+int find_sigma(int nnz, int rows){
+	//returns sigma value given sparcity nnz/rows
+	int r = 8; int s = 64; int t = 512; int u = 8;
+
+	if ((nnz/rows) <= r) return r;
+	
+	else if ((r < (nnz/rows)) && ((nnz/rows) <= s)){
+	       int sigma =  nnz/rows;
+       	       return sigma;
+	}
+	else if ((s < (nnz/rows)) && ((nnz/rows) <= t)) 
+		return s;
+	
+	else if ((nnz/rows) < t) return u;	
+	return r; //incase something horrible happens ig
 }
 
 // --- Sell-C-sigma conversion function --- 
@@ -173,7 +191,7 @@ int main(int argc, char** argv) {
     char matrixName[MAX_FILENAME];
     strcpy(matrixName, argv[1]);
     int is_symmetric = 0;
-    read_info(matrixName, &is_symmetric);
+    //read_info(matrixName, &is_symmetric);
 
 
     // Read the sparse matrix and store it in row_ind, col_ind, and val,
@@ -232,13 +250,13 @@ int main(int argc, char** argv) {
     // ==========================================
     double* bb = (double*) malloc(sizeof(double) * m);
     assert(bb);
-    fprintf(stdout, "Calculating CPU CSR SpMV ... ");
+    //fprintf(stdout, "Calculating CPU CSR SpMV ... ");
     t0 = ReadTSC();
     for(unsigned int i = 0; i < MAX_ITER; i++) {
         spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
     }
     timer[SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
-    fprintf(stdout, "done\n");
+    //fprintf(stdout, "done\n");
 
     // ==========================================
     // Execute SPMV
@@ -266,8 +284,8 @@ int main(int argc, char** argv) {
         // Verify and log
         get_result_gpu(db, h_check, m);
         double err = calc_diff(m, bb, h_check);
-        log_csv("CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
-        fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
+       // log_csv("CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+       // fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
         if (threads == 64) timer[GPU_SPMV_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
     };
@@ -297,9 +315,9 @@ int main(int argc, char** argv) {
         // Verify and log
         get_result_gpu(db, h_check, m);
         double err = calc_diff(m, h_check, bb);
-        log_csv("ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+        //log_csv("ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
-        fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
+        //fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
         if (threads == 64) {
             timer[GPU_ELL_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
@@ -323,7 +341,7 @@ int main(int argc, char** argv) {
         double err = be[i] - bb[i];
         ell_diff += err * err;
     }
-    printf("DEBUG: ELL 2-Norm: %e\n", sqrt(ell_diff));
+    //printf("DEBUG: ELL 2-Norm: %e\n", sqrt(ell_diff));
     // --- DEBUGGING CODE END ---
 
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
@@ -360,7 +378,7 @@ int main(int argc, char** argv) {
                     d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
                     dx, db, &time_ms);
     timer[GPU_SELL_C_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
-    fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
+    //fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
     // Unscramble and verify correctness
     double* h_y_sigma = (double*) malloc(sizeof(double) * m_padded_sell);
     cudaMemcpy(h_y_sigma, db, m * sizeof(double), cudaMemcpyDeviceToHost);
@@ -372,8 +390,8 @@ int main(int argc, char** argv) {
         // Store unscrambled result for final save file
         be[original_idx] = h_y_sigma[i];
     }
-    log_csv("SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
-    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
+    //log_csv("SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
+    //fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
 
     // Free SELL-C specific memory
     cudaFree(d_sell_slice_ptr);
@@ -451,7 +469,40 @@ int main(int argc, char** argv) {
     free(h_csr5_tile_desc);
     free(h_check);
 
+	//==================================================
+    //ALSO  AGAIN WITH ALLOCATING CSR5 TO GPU      wowowowow
+       //===================================================
+    fprintf(stdout, "Executing GPU CSR5 SpMV (PART 2)... \n");
+    int csr5_num_tiles2;
+    double *h2_csr5_vals = NULL;
+    int* h2_csr5_col_idx = NULL;
+    int* h2_csr5_row_idx = NULL;
+    int* h2_csr5_tile_ptr = NULL;
+    unsigned int* h2_csr5_tile_desc = NULL;
+	
+    int sigma = find_sigma(nnz, m);
+	fprintf(stdout, "sigma is %d\n", sigma);     
 
+    //host wowow
+    t0 = ReadTSC();
+    convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals, 
+                        &csr5_num_tiles, &h_csr5_vals, &h_csr5_col_idx, 
+                        &h_csr5_row_idx, &h_csr5_tile_ptr, &h_csr5_tile_desc);
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
+
+    // GPU allocation
+    double* d2_csr5_vals = NULL;
+    int* d2_csr5_col_idx = NULL;
+    int* d2_csr5_row_idx = NULL;
+    int* d2_csr5_tile_ptr = NULL;
+    unsigned int* d2_csr5_tile_desc = NULL;
+    // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
+    int csr5_capacity2 = csr5_num_tiles * 32 * 16;
+    // Values
+
+
+
+    //END CARMEN CODE
 
 
 

@@ -5,7 +5,7 @@ CPP = g++
 NVCC = nvcc
 
 # Specify subdirectory to search for headers and source files
-VPATH = helpers:NaiveCSR5
+VPATH = helpers:csr5
 # --- Flags ---
 # C compilation flags
 CFLAGS = -O3 -fopenmp -lm -std=c11

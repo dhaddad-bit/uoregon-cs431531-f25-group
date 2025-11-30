@@ -39,6 +39,24 @@ void spmv_gpu_csr5(
     float* time_ms
 );
 
+
+void convert_csr_to_csr5_gpu(
+    //Inputs
+    int m, int n, int nnz,
+    const unsigned int* h_row_ptr,
+    const unsigned int* h_col_idx,
+    const double* h_val,
+    // Outputs
+    int* num_tiles,
+    double** h_csr5_val,
+    int** h_csr5_col_idx,
+    int** h_csr5_row_idx, 
+    int** h_csr5_tile_ptr,
+    uint32_t** h_csr5_tile_desc
+);
+
+
+
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---
 #ifdef __cplusplus
 }

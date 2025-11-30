@@ -14,6 +14,30 @@ void check(cudaError_t result, char const* const func, const char* const file, i
     }
 }
 
+
+
+
+void convert_csr_to_csr5_gpu(
+    //Inputs
+    int m, int n, int nnz,
+    const unsigned int* og_row_ptr,
+    const unsigned int* og_col_idx,
+    const double* og_val,
+    // Outputs
+    int* num_tiles,
+    double** h_csr5_val,
+    int** h_csr5_col_idx,
+    int** h_csr5_row_idx, 
+    int** h_csr5_tile_ptr,
+    uint32_t** h_csr5_tile_desc
+){
+
+
+}
+
+
+
+
 // Helper: unpack the popcount of a 32-bit integer (our packed [bitflag|y_offset|seg_offset])
 __device__ inline void unpack_tile_desc(unsigned int desc, unsigned int &bitflag, int &y_offset,
                                         int &seg_offset
@@ -125,5 +149,22 @@ extern "C" void spmv_gpu_csr5(
     checkCudaErrors(cudaEventDestroy(stop));
     checkCudaErrors(cudaGetLastError());
 }
-                                            
+     
+
+
+void convert_csr_to_csr5_gpu(
+    int m, int n, int nnz,
+    const unsigned int* h_row_ptr,
+    const unsigned int* h_col_idx,
+    const double* h_val,
+    // Outputs
+    int* num_tiles,
+    double** h_csr5_val,
+    int** h_csr5_col_idx,
+    int** h_csr5_row_idx, // Row versioning of CSR5 to test what's wrong with my computation logic,, i rushed it at 2am and it doesn't work
+    int** h_csr5_tile_ptr,
+    uint32_t** h_csr5_tile_desc
+);
+
+
                                             
