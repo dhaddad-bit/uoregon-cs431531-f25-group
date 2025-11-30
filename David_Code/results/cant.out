@@ -1,0 +1,62 @@
+-----------------------------------------------------
+Matrix name:     matrices/cant/cant.mtx
+Matrix size:     62451 x 62451 => 2034917
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    1
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: matrices/cant/cant.mtx ... file loaded.
+Expanding symmetric matrix ... done
+  Total # of non-zeros is 4007383
+Converting COO to CSR...done
+Vector file name: matrices/cant/b.mtx ... file loaded
+Calculating CPU CSR SpMV ... done
+Executing GPU CSR SpMV ... 
+CSR,32,0.000078430,0.000000000,102.1895,632.2475,1.830217e-10
+ CSR Threads: 32, Time (ms): 0.078430 ms
+CSR,64,0.000067158,0.000000000,119.3412,738.3651,1.768525e-10
+ CSR Threads: 64, Time (ms): 0.067158 ms
+CSR,128,0.000100254,0.000000000,79.9448,494.6191,1.769595e-10
+ CSR Threads: 128, Time (ms): 0.100254 ms
+CSR,256,0.000185108,0.000000000,43.2979,267.8844,1.769595e-10
+ CSR Threads: 256, Time (ms): 0.185108 ms
+Executing GPU ELL SpMV ... 
+ELL,32,0.000083016,0.000000000,96.5445,597.3213,1.830217e-10
+ ELL Threads: 32, Time (ms): 0.083016 ms
+ELL,64,0.000068455,0.000000000,117.0802,724.3760,1.768525e-10
+ ELL Threads: 64, Time (ms): 0.068455 ms
+ELL,128,0.000092107,0.000000000,87.0156,538.3664,1.769595e-10
+ ELL Threads: 128, Time (ms): 0.092107 ms
+ELL,256,0.000169504,0.000000000,47.2836,292.5437,1.769595e-10
+ ELL Threads: 256, Time (ms): 0.169504 ms
+DEBUG: ELL 2-Norm: 1.769595e-10
+Executing GPU SELL-C-Sigma SpMV ... 
+ SELL-C-Sigma Time (ms): 0.053418 ms
+SELL-C-Sigma,32,0.000053418,0.000000000,150.0389,928.2918,1.195589e-10
+2-Norm difference between CSR and SELL-C-Sigma results: 1.429432e-20
+Executing GPU CSR5 SpMV ... 
+CSR5,32,0.000172012,0.000000000,46.5944,288.2796,7.723135e-11
+ CSR5 Time (ms): 0.172012 ms
+2-Norm difference between CSR and CSR5 results: 7.723135e-11
+2-Norm between CPU and GPU answers: 1.195589e-10
+Result file name: results/cant_result.mtx ... file saved
+Module		Time
+Load		0.981094
+Convert		0.265565
+CPU SpMV	0.015626
+GPU Alloc	0.299987
+GPU SpMV	0.006716
+GPU ELL SpMV	0.006846
+GPU SELL-C SpMV	0.005342
+GPU CSR5 SpMV	0.017201
+Store		0.031437

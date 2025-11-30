@@ -1,0 +1,60 @@
+-----------------------------------------------------
+Matrix name:     matrices/name131/name131.mtx
+Matrix size:     131 x 131 => 536
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      1
+Is symmetric:    0
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: matrices/name131/name131.mtx ... file loaded.
+Converting COO to CSR...done
+Vector file name: matrices/name131/b_name131.mtx ... file loaded
+Calculating CPU CSR SpMV ... done
+Executing GPU CSR SpMV ... 
+CSR,32,0.000011203,0.000000000,0.0957,0.8548,1.996512e-07
+ CSR Threads: 32, Time (ms): 0.011203 ms
+CSR,64,0.000010112,0.000000000,0.1060,0.9470,1.996512e-07
+ CSR Threads: 64, Time (ms): 0.010112 ms
+CSR,128,0.000010315,0.000000000,0.1039,0.9283,1.996512e-07
+ CSR Threads: 128, Time (ms): 0.010315 ms
+CSR,256,0.000010705,0.000000000,0.1001,0.8946,1.996512e-07
+ CSR Threads: 256, Time (ms): 0.010705 ms
+Executing GPU ELL SpMV ... 
+ELL,32,0.000010332,0.000000000,0.1038,0.9268,1.996512e-07
+ ELL Threads: 32, Time (ms): 0.010332 ms
+ELL,64,0.000010066,0.000000000,0.1065,0.9513,1.996512e-07
+ ELL Threads: 64, Time (ms): 0.010066 ms
+ELL,128,0.000010219,0.000000000,0.1049,0.9371,1.996512e-07
+ ELL Threads: 128, Time (ms): 0.010219 ms
+ELL,256,0.000010341,0.000000000,0.1037,0.9260,1.996512e-07
+ ELL Threads: 256, Time (ms): 0.010341 ms
+DEBUG: ELL 2-Norm: 1.996512e-07
+Executing GPU SELL-C-Sigma SpMV ... 
+ SELL-C-Sigma Time (ms): 0.011336 ms
+SELL-C-Sigma,32,0.000011336,0.000000000,0.0946,0.8448,4.711573e-07
+2-Norm difference between CSR and SELL-C-Sigma results: 2.219892e-13
+Executing GPU CSR5 SpMV ... 
+CSR5,32,0.000006093,0.000000000,0.1759,1.5717,3.725290e-09
+ CSR5 Time (ms): 0.006093 ms
+2-Norm difference between CSR and CSR5 results: 3.725290e-09
+2-Norm between CPU and GPU answers: 4.711573e-07
+Result file name: results/name131_result.mtx ... file saved
+Module		Time
+Load		0.000515
+Convert		0.000965
+CPU SpMV	0.001408
+GPU Alloc	0.210456
+GPU SpMV	0.001011
+GPU ELL SpMV	0.001007
+GPU SELL-C SpMV	0.001134
+GPU CSR5 SpMV	0.000609
+Store		0.001463

@@ -5,7 +5,7 @@ CPP = g++
 NVCC = nvcc
 
 # Specify subdirectory to search for headers and source files
-VPATH = helpers:CSR5_attempt:include
+VPATH = helpers:NaiveCSR5
 # --- Flags ---
 # C compilation flags
 CFLAGS = -O3 -fopenmp -lm -std=c11
@@ -18,7 +18,7 @@ NVCCFLAGS = -O3 -gencode arch=compute_80,code=sm_80 -std=c++11
 # --- Includes and Libs ---
 # Use the environment variable CUDA_HOME provided by the module
 CUDA_PATH ?= $(CUDA_HOME)
-NVCCINC = -I$(CUDA_PATH)/include -I$(CUDA_PATH)/samples/common/inc -Ihelpers -ICSR5_attempt
+NVCCINC = -I$(CUDA_PATH)/include -I$(CUDA_PATH)/samples/common/inc -Ihelpers -INaiveCSR5
 LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lm -fopenmp
 
 # --- Files ---

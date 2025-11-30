@@ -1,0 +1,62 @@
+-----------------------------------------------------
+Matrix name:     matrices/bcsstk/bcsstk.mtx
+Matrix size:     11948 x 11948 => 80519
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    1
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: matrices/bcsstk/bcsstk.mtx ... file loaded.
+Expanding symmetric matrix ... done
+  Total # of non-zeros is 149090
+Converting COO to CSR...done
+Vector file name: matrices/bcsstk/b_bcsstk.mtx ... file loaded
+Calculating CPU CSR SpMV ... done
+Executing GPU CSR SpMV ... 
+CSR,32,0.000020792,0.000000000,14.3413,99.8395,1.902805e-05
+ CSR Threads: 32, Time (ms): 0.020792 ms
+CSR,64,0.000019489,0.000000000,15.2999,106.5132,1.902957e-05
+ CSR Threads: 64, Time (ms): 0.019489 ms
+CSR,128,0.000022821,0.000000000,13.0660,90.9610,1.902957e-05
+ CSR Threads: 128, Time (ms): 0.022821 ms
+CSR,256,0.000035598,0.000000000,8.3764,58.3136,1.902957e-05
+ CSR Threads: 256, Time (ms): 0.035598 ms
+Executing GPU ELL SpMV ... 
+ELL,32,0.000020246,0.000000000,14.7278,102.5301,1.902805e-05
+ ELL Threads: 32, Time (ms): 0.020246 ms
+ELL,64,0.000019433,0.000000000,15.3438,106.8184,1.902957e-05
+ ELL Threads: 64, Time (ms): 0.019433 ms
+ELL,128,0.000022264,0.000000000,13.3927,93.2358,1.902957e-05
+ ELL Threads: 128, Time (ms): 0.022264 ms
+ELL,256,0.000033978,0.000000000,8.7757,61.0936,1.902957e-05
+ ELL Threads: 256, Time (ms): 0.033978 ms
+DEBUG: ELL 2-Norm: 1.902957e-05
+Executing GPU SELL-C-Sigma SpMV ... 
+ SELL-C-Sigma Time (ms): 0.016303 ms
+SELL-C-Sigma,32,0.000016303,0.000000000,18.2902,127.3304,1.209781e-05
+2-Norm difference between CSR and SELL-C-Sigma results: 1.463569e-10
+Executing GPU CSR5 SpMV ... 
+CSR5,32,0.000008929,0.000000000,33.3935,232.4747,1.695841e-06
+ CSR5 Time (ms): 0.008929 ms
+2-Norm difference between CSR and CSR5 results: 1.695841e-06
+2-Norm between CPU and GPU answers: 1.209781e-05
+Result file name: results/bcsstk_result.mtx ... file saved
+Module		Time
+Load		0.043072
+Convert		0.014624
+CPU SpMV	0.002119
+GPU Alloc	0.199888
+GPU SpMV	0.001949
+GPU ELL SpMV	0.001943
+GPU SELL-C SpMV	0.001630
+GPU CSR5 SpMV	0.000893
+Store		0.007457
