@@ -43,9 +43,10 @@ void spmv_gpu_csr5(
 void convert_csr_to_csr5_gpu(
     //Inputs
     int m, int n, int nnz,
-    const unsigned int* h_row_ptr,
-    const unsigned int* h_col_idx,
-    const double* h_val,
+    const unsigned int* og_row_ptr,
+    const unsigned int* og_col_idx,
+    const double* og_val,
+    int *omega, int *sigma,
     // Outputs
     int* num_tiles,
     double** h_csr5_val,

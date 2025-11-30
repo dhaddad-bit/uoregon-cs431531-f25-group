@@ -23,14 +23,16 @@ void convert_csr_to_csr5_gpu(
     const unsigned int* og_row_ptr,
     const unsigned int* og_col_idx,
     const double* og_val,
+    int* sigma, int* omega,
     // Outputs
     int* num_tiles,
-    double** h_csr5_val,
-    int** h_csr5_col_idx,
-    int** h_csr5_row_idx, 
-    int** h_csr5_tile_ptr,
-    uint32_t** h_csr5_tile_desc
+    double** gpu_csr5_val,
+    int** gpu_csr5_col_idx,
+    int** gpu_csr5_row_idx, 
+    int** gpu_csr5_tile_ptr,
+    uint32_t** gpu_csr5_tile_desc
 ){
+
 
 
 }
@@ -152,19 +154,3 @@ extern "C" void spmv_gpu_csr5(
      
 
 
-void convert_csr_to_csr5_gpu(
-    int m, int n, int nnz,
-    const unsigned int* h_row_ptr,
-    const unsigned int* h_col_idx,
-    const double* h_val,
-    // Outputs
-    int* num_tiles,
-    double** h_csr5_val,
-    int** h_csr5_col_idx,
-    int** h_csr5_row_idx, // Row versioning of CSR5 to test what's wrong with my computation logic,, i rushed it at 2am and it doesn't work
-    int** h_csr5_tile_ptr,
-    uint32_t** h_csr5_tile_desc
-);
-
-
-                                            

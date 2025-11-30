@@ -452,10 +452,10 @@ int main(int argc, char** argv) {
     // Verify and log
     get_result_gpu(db, h_check, m);
     double csr5_diff = calc_diff(m, h_check, bb);
-    log_csv("CSR5", 32, time_ms / 1000.0, 0.0, nnz, m, n, csr5_diff);
-    fprintf(stdout, " CSR5 Time (ms): %f ms\n", time_ms);
+    //log_csv("CSR5", 32, time_ms / 1000.0, 0.0, nnz, m, n, csr5_diff);
+    //fprintf(stdout, " CSR5 Time (ms): %f ms\n", time_ms);
 
-    fprintf(stdout, "2-Norm difference between CSR and CSR5 results: %e\n", csr5_diff);
+    //fprintf(stdout, "2-Norm difference between CSR and CSR5 results: %e\n", csr5_diff);
     // Cleanup for CSR5
     cudaFree(d_csr5_vals);
     cudaFree(d_csr5_col_idx);
@@ -473,21 +473,24 @@ int main(int argc, char** argv) {
     //ALSO  AGAIN WITH ALLOCATING CSR5 TO GPU      wowowowow
        //===================================================
     fprintf(stdout, "Executing GPU CSR5 SpMV (PART 2)... \n");
-    int csr5_num_tiles2;
-    double *h2_csr5_vals = NULL;
-    int* h2_csr5_col_idx = NULL;
-    int* h2_csr5_row_idx = NULL;
-    int* h2_csr5_tile_ptr = NULL;
-    unsigned int* h2_csr5_tile_desc = NULL;
+    int omega = 32;//for GPU
+    double *gpu_csr5_vals = NULL;
+    int* gpu_csr5_col_idx = NULL;
+    int* gpu_csr5_row_idx = NULL;
+    int* gpu_csr5_tile_ptr = NULL;
+    unsigned int* gpu_csr5_tile_desc = NULL;
 	
     int sigma = find_sigma(nnz, m);
-	fprintf(stdout, "sigma is %d\n", sigma);     
-
+	//fprintf(stdout, "sigma is %d\n", sigma);     
+    int num_tiles_p = std::ceil(nnz/(omega*sigma));
+    	fprintf(stdout, "number of tiles is %d\n", num_tiles_p);
+	
     //host wowow
     t0 = ReadTSC();
-    convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals, 
-                        &csr5_num_tiles, &h_csr5_vals, &h_csr5_col_idx, 
-                        &h_csr5_row_idx, &h_csr5_tile_ptr, &h_csr5_tile_desc);
+    convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
+		        &sigma, &omega,  
+                        &num_tiles_p, &gpu_csr5_vals, &h_csr5_col_idx, 
+                        &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_tile_desc);
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation
