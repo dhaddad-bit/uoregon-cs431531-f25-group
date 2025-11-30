@@ -1,18 +1,19 @@
 #include <stdio.h>
-#include <stdlib.h>
+//#include <stdlib.h>
+#include <cstdlib>
 #include <string.h>
 #include <assert.h>
 #include <omp.h>
+
 #include "mmio.h"
+#include "gpu_spmv.h"
 
 /*
-Program to produce a correct result of SpMV using serial CSR formatting
-in order to check our work
 */
 
 #define MAX_LEN 100
 
-void read_vector(char *file, double **vector, int *size) {
+void read_vector(const char *file, double **vector, int *size) {
 
     char buffer[MAX_LEN];
     char read[MAX_LEN];
@@ -41,7 +42,7 @@ void read_vector(char *file, double **vector, int *size) {
     fclose(fptr);
 }
 
-void read_matrix(char *file, int *num_rows, int *num_cols, int *num_nnz, 
+void read_matrix(const char *file, int *num_rows, int *num_cols, int *num_nnz, 
     unsigned int **rows, unsigned int **cols, double **values) {
 
     FILE* fp;
@@ -68,7 +69,7 @@ void read_matrix(char *file, int *num_rows, int *num_cols, int *num_nnz,
     unsigned int *c_array = (unsigned int *)malloc(sizeof(unsigned int) * nnz);
     double *nz_array = (double *)malloc(sizeof(double) * nnz);
 
-    if(mm_read_mtx_crd_data(fp, m, n, nnz, r_array, c_array, nz_array, matcode) != 0) {
+    if(mm_read_mtx_crd_data(fp, m, n, nnz, (int *)r_array, (int *)c_array, nz_array, matcode) != 0) {
         fprintf(stderr, "Error reading matrix data.\n");
         exit(EXIT_FAILURE);
     }
@@ -115,8 +116,6 @@ void read_matrix(char *file, int *num_rows, int *num_cols, int *num_nnz,
         nnz = actual_nnz;
 
     }
-
-
 
     *rows = r_array;
     *cols = c_array;
@@ -183,7 +182,7 @@ void spmv_csr(unsigned int *row_ptr, unsigned int *col_ind, double *vals,
         #pragma omp parallel
     {
         #pragma omp for
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < m; i++) {
             result[i] = 0.0;
         }
         // Go through rows
@@ -201,7 +200,7 @@ void spmv_csr(unsigned int *row_ptr, unsigned int *col_ind, double *vals,
     }
 }
 
-void store_result(char *file, double *result, int m) {
+void store_result(const char *file, double *result, int m) {
     FILE* fptr = fopen(file, "w");
     assert(fptr);
 
