@@ -5,20 +5,19 @@ Executing GPU CSR SpMV ...
 Executing GPU ELL SpMV ... 
 Executing GPU SELL-C-Sigma SpMV ... 
 Executing GPU CSR5 SpMV ... 
-CSR5,32,0.000078776,0.000000000,51.6632,329.0053,3.906842e-11
- CSR5 Time (ms): 0.078776 ms
-2-Norm difference between CSR and CSR5 results: 3.906842e-11
 Executing GPU CSR5 SpMV (PART 2)... 
-sigma is 32
+number of tiles is 1987
+Allocated with pitch: 508928 bytes
+Allocated with pitch: 254464 bytes
 2-Norm between CPU and GPU answers: 8.493476e-11
 Result file name: ./test.mtx ... file saved
 Module		Time
-Load		0.968532
-Convert		0.148175
-CPU SpMV	0.008364
-GPU Alloc	0.264816
-GPU SpMV	0.005734
-GPU ELL SpMV	0.005716
-GPU SELL-C SpMV	0.002229
-GPU CSR5 SpMV	0.007878
-Store		0.032353
+Load		0.982383
+Convert		0.146655
+CPU SpMV	0.008240
+GPU Alloc	0.272330
+GPU SpMV	0.005719
+GPU ELL SpMV	0.005729
+GPU SELL-C SpMV	0.002199
+GPU CSR5 SpMV	0.007926
+Store		0.036204

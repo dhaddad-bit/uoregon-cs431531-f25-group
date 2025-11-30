@@ -28,11 +28,36 @@ void convert_csr_to_csr5_gpu(
     int* num_tiles,
     double** gpu_csr5_val,
     int** gpu_csr5_col_idx,
-    int** gpu_csr5_row_idx, 
+    int** gpu_csr5_row_ptr, 
     int** gpu_csr5_tile_ptr,
     uint32_t** gpu_csr5_tile_desc
-){
+){	
+	size_t pitch_val, pitch_col;
+	//allocate memory for value blocks, 
+	//cudaMallocPitch(gpu_csr5_val, omega, sigma * num_tiles);
+	cudaMallocPitch((void**)gpu_csr5_val, &pitch_val, 
+                   (*omega) * (*num_tiles) * sizeof(double),  // width in BYTES
+                   *sigma);                                   // height in rows
+        printf("Allocated with pitch: %zu bytes\n", pitch_val);
+    	// Store the actual pitch if needed
+   	// *omega = pitch / sizeof(double);  // Convert pitch back to elements if needed
+    
+    	// Similarly allocate other 2D arrays
+    	cudaMallocPitch((void**)gpu_csr5_col_idx, &pitch_col, 
+                   (*omega) * (*num_tiles) * sizeof(int), 
+                   *sigma);
+        printf("Allocated with pitch: %zu bytes\n", pitch_col);
 
+	//1D allocation and can copy memory for rowptr since they the same
+	cudaMalloc((void**)gpu_csr5_row_ptr, (m+1)*sizeof(int));
+
+	cudaMemcpy(*gpu_csr5_row_ptr, og_row_ptr, (m+1)*sizeof(int), cudaMemcpyHostToDevice);
+
+	//also mempry for the tile ptr
+	cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles)*sizeof(int));//maybe this should be unsigned int though
+
+	
+    
 
 
 }
