@@ -1,0 +1,67 @@
+-----------------------------------------------------
+Matrix name:     cant/cant.mtx
+Matrix size:     62451 x 62451 => 2034917
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    1
+Is skewed:       0
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: cant/cant.mtx ... file loaded.
+Expanding symmetric matrix ... done
+  Total # of non-zeros is 4007383
+Converting COO to CSR...done
+Vector file name: cant/b.mtx ... file loaded
+Calculating CPU CSR SpMV ... done
+Executing GPU CSR SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 1.697065
+  Pinned Device to Host bandwidth (GB/s): 4.603394
+  Pinned Device to Host bandwidth (GB/s): 6.226357
+  Pinned Device to Host bandwidth (GB/s): 7.897193
+  Running CSR with 32 threads...
+  Exec time (per itr): 0.00044770 s
+  Running CSR with 64 threads...
+  Exec time (per itr): 0.00040425 s
+  Running CSR with 128 threads...
+  Exec time (per itr): 0.00064572 s
+  Running CSR with 256 threads...
+  Exec time (per itr): 0.00124332 s
+  Pinned Host to Device bandwidth (GB/s): 1.082190
+Executing GPU ELL SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 4.390189
+  Pinned Device to Host bandwidth (GB/s): 18.328408
+  Running ELL with 32 threads...
+  Exec time (per itr): 0.00050646 s
+  Running ELL with 64 threads...
+  Exec time (per itr): 0.00044067 s
+  Running ELL with 128 threads...
+  Exec time (per itr): 0.00059721 s
+  Running ELL with 256 threads...
+  Exec time (per itr): 0.00116194 s
+  Pinned Host to Device bandwidth (GB/s): 1.118472
+DEBUG: ELL 2-Norm: 1.769595e-10
+Executing GPU SELL-C-Sigma SpMV ... 
+  Pinned Device to Host bandwidth (GB/s): 0.176391
+  Pinned Device to Host bandwidth (GB/s): 4.615294
+  Pinned Device to Host bandwidth (GB/s): 6.038011
+  Exec time (per itr): 0.00025906 s
+2-Norm difference between CSR and SELL-C-Sigma results: 4.806907e+05
+2-Norm between CPU and GPU answers: 4.806907e+05
+Result file name: ./test.mtx ... file saved
+Module		Time
+Load		0.584066
+Convert		0.047456
+CPU SpMV	0.020027
+GPU Alloc	0.245093
+GPU SpMV	0.040441
+GPU ELL SpMV	0.044082
+GPU SELL-C SpMV	0.025997
+Store		0.016858

@@ -1,0 +1,60 @@
+-----------------------------------------------------
+Matrix name:     matrices/plsk1919/plsk1919.mtx
+Matrix size:     1919 x 1919 => 4831
+-----------------------------------------------------
+Is matrix:       1
+Is sparse:       1
+-----------------------------------------------------
+Is complex:      0
+Is real:         1
+Is integer:      0
+Is pattern only: 0
+-----------------------------------------------------
+Is general:      0
+Is symmetric:    0
+Is skewed:       1
+Is hermitian:    0
+-----------------------------------------------------
+Matrix file name: matrices/plsk1919/plsk1919.mtx ... file loaded.
+Converting COO to CSR...done
+Vector file name: matrices/plsk1919/b_plsk1919.mtx ... file loaded
+Calculating CPU CSR SpMV ... done
+Executing GPU CSR SpMV ... 
+CSR,32,0.000012319,0.000000000,0.7843,8.4447,5.660864e-16
+ CSR Threads: 32, Time (ms): 0.012319 ms
+CSR,64,0.000011177,0.000000000,0.8645,9.3074,5.660864e-16
+ CSR Threads: 64, Time (ms): 0.011177 ms
+CSR,128,0.000011593,0.000000000,0.8335,8.9736,5.660864e-16
+ CSR Threads: 128, Time (ms): 0.011593 ms
+CSR,256,0.000013821,0.000000000,0.6991,7.5266,5.660864e-16
+ CSR Threads: 256, Time (ms): 0.013821 ms
+Executing GPU ELL SpMV ... 
+ELL,32,0.000011288,0.000000000,0.8559,9.2155,5.660864e-16
+ ELL Threads: 32, Time (ms): 0.011288 ms
+ELL,64,0.000011230,0.000000000,0.8604,9.2633,5.660864e-16
+ ELL Threads: 64, Time (ms): 0.011230 ms
+ELL,128,0.000011675,0.000000000,0.8276,8.9107,5.660864e-16
+ ELL Threads: 128, Time (ms): 0.011675 ms
+ELL,256,0.000013726,0.000000000,0.7039,7.5789,5.660864e-16
+ ELL Threads: 256, Time (ms): 0.013726 ms
+DEBUG: ELL 2-Norm: 5.660864e-16
+Executing GPU SELL-C-Sigma SpMV ... 
+ SELL-C-Sigma Time (ms): 0.010906 ms
+SELL-C-Sigma,32,0.000010906,0.000000000,0.8860,9.5390,4.532082e-16
+2-Norm difference between CSR and SELL-C-Sigma results: 2.053976e-31
+Executing GPU CSR5 SpMV ... 
+CSR5,32,0.000006892,0.000000000,1.4020,15.0951,3.103168e-17
+ CSR5 Time (ms): 0.006892 ms
+2-Norm difference between CSR and CSR5 results: 3.103168e-17
+2-Norm between CPU and GPU answers: 4.532082e-16
+Result file name: results/plsk1919_result.mtx ... file saved
+Module		Time
+Load		0.002948
+Convert		0.001378
+CPU SpMV	0.001557
+GPU Alloc	0.209354
+GPU SpMV	0.001118
+GPU ELL SpMV	0.001123
+GPU SELL-C SpMV	0.001091
+GPU CSR5 SpMV	0.000689
+Store		0.002072
