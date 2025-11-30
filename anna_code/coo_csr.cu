@@ -90,8 +90,8 @@ __host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
 __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
                     double* x, double* b) 
 {
-    const int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-    const int warp_id = thread_id / 32;
+    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const int warp_id = tid / 32;
     const int lane_id = threadIdx.x % 32;
 
     int row = warp_id; // just 1 warp per row
@@ -145,7 +145,30 @@ __host__ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, double* v
 __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
                         double *x, double *b)
 {
+    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const int warp_id = tid / 32;
+    const int lane_id = threadIdx.x % 32;
+    int ind;
 
+    for (ind = tid; ind < nnz; ind += 32) {
+        double val = vals[ind] * x[col_ind[ind]];
+        // segmented scan according to current row
+        int prev_row = __shfl_up_sync(0xffffffff, row_ind[ind], 1);
+        bool new_row = false;
+        if (lane_id == 0 || row_ind[ind] != prev_row) {
+            new_row = true;
+        }
+        for (int offset = 1; offset < 32; offset *= 2) {
+            double tmp = __shfl_up_sync(0xffffffff, val, offset);
+            int tmp_row = __shfl_up_sync(0xffffffff, row_ind[ind], offset);
+            if (lane_id >= offset && tmp_row == row_ind[ind]) {
+                val += tmp;
+            }
+        }
+        if (new_row == true) {
+            atomicAdd(&b[row_ind[ind]], val);
+        }
+    }
 }
 
 __host__ void vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
