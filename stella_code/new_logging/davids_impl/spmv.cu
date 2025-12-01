@@ -9,7 +9,7 @@
 #include <cooperative_groups.h>
 #include "spmv.h"
 
-#define MAX_ITER 100
+#define MAX_ITER 1
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 inline void check_cuda(cudaError_t result, const char* const func, const char* const file, int const line) {

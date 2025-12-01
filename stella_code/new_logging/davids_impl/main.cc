@@ -256,24 +256,21 @@ int main(int argc, char** argv) {
 
     // Test different thread counts
     int thread_counts[] = {32, 64, 128, 256};
-    int num_tests = 4;
+    int num_tests = 1;
     
     // Temp buffer for verification
     double* h_check = (double*)malloc(sizeof(double) * m);
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
 
-	t0 = ReadTSC();
         spmv_gpu(drp, dci, dv, m, n, nnz, dx, db, threads, &time_ms);
 
 	// Verify and log
         get_result_gpu(db, h_check, m);
 	cudaDeviceSynchronize();
 
-	time = ElapsedTime(ReadTSC() - t0);
-
         double err = calc_diff(m, bb, h_check);
-        log_csv(mat_name, "CSR", threads, time, 0.0, nnz, m, n, err);
+        log_csv(mat_name, "CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 //        fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
         if (threads == 64) timer[GPU_SPMV_TIME] += time * MAX_ITER; // convert to seconds and multiply by iterations
@@ -300,16 +297,13 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
-	t0 = ReadTSC();
         spmv_gpu_ell(dec, dev, m, n_new, nnz, dx, db, threads, &time_ms);
         // Verify and log
         get_result_gpu(db, h_check, m);
 	cudaDeviceSynchronize();
 
-	time = ElapsedTime(ReadTSC() - t0);
-
         double err = calc_diff(m, h_check, bb);
-        log_csv(mat_name, "ELL", threads, time, 0.0, nnz, m, n, err);
+        log_csv(mat_name, "ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
 //        fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
@@ -368,12 +362,10 @@ int main(int argc, char** argv) {
     CopyData(h_sell_col_ind, total_nnz_sell, sizeof(unsigned int), &d_sell_col_ind);
     CopyData(h_sell_vals, total_nnz_sell, sizeof(double), &d_sell_vals);
     // Run SPMV Benchmark Loop
-    t0 = ReadTSC();
     spmv_gpu_sellc(m, num_slices, SLICE_THICKNESS, 
                     d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
                     dx, db, &time_ms);
     cudaDeviceSynchronize();
-    time = ElapsedTime(ReadTSC() - t0);
 
     timer[GPU_SELL_C_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
 //    fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
@@ -388,7 +380,7 @@ int main(int argc, char** argv) {
         // Store unscrambled result for final save file
         be[original_idx] = h_y_sigma[i];
     }
-    log_csv(mat_name, "SELL-C-Sigma", SLICE_THICKNESS, time, 0.0, nnz, m, n, sqrt(sigma_diff));
+    log_csv(mat_name, "SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
 //    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
 
     // Free SELL-C specific memory
@@ -443,18 +435,16 @@ int main(int argc, char** argv) {
     cudaMemcpy(d_csr5_tile_desc, h_csr5_tile_desc, csr5_num_tiles * 32 * sizeof(unsigned int), cudaMemcpyHostToDevice);
     // Run the Benchmark loop
     // Reusing dx and db from previous steps
-    t0 = ReadTSC();
     spmv_gpu_csr5(m, csr5_num_tiles, d_csr5_vals, 
                   d_csr5_col_idx, d_csr5_row_idx, d_csr5_tile_ptr, 
                   d_csr5_tile_desc, dx, db, &time_ms);
     cudaDeviceSynchronize();
-    time = ElapsedTime(ReadTSC() - t0);
 
     timer[GPU_CSR5_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
     // Verify and log
     get_result_gpu(db, h_check, m);
     double csr5_diff = calc_diff(m, h_check, bb);
-    log_csv(mat_name, "CSR5", 32, time, 0.0, nnz, m, n, csr5_diff);
+    log_csv(mat_name, "CSR5", 32, time_ms / 1000.0, 0.0, nnz, m, n, csr5_diff);
 //    fprintf(stdout, " CSR5 Time (ms): %f ms\n", time_ms);
 
 //    fprintf(stdout, "2-Norm difference between CSR and CSR5 results: %e\n", csr5_diff);

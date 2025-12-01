@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#define MAX_ITER 100
+#define MAX_ITER 1
 
 // Helper: to check for CUDA errors (My saving grace for debugging)
 #define checkCudaErrors(val) check((val), #val, __FILE__, __LINE__)
