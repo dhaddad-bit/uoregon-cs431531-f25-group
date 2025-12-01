@@ -15,6 +15,10 @@
 
 typedef char MM_typecode[4];
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char *mm_typecode_to_str(MM_typecode matcode);
 
 int mm_read_banner(FILE *f, MM_typecode *matcode);
@@ -128,6 +132,8 @@ int mm_read_mtx_crd_entry(FILE *f, int *I, int *J, double *real, double *img,
 int mm_read_unsymmetric_sparse(const char *fname, int *M_, int *N_, int *nz_,
                 double **val_, int **I_, int **J_);
 
-
+#ifdef __cplusplus // End the C++ guard
+}
+#endif
 
 #endif

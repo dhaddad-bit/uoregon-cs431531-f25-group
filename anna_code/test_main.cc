@@ -242,13 +242,25 @@ int main(int argc, char *argv[]) {
     int vec_size = 0;
     read_vector(vector_name, &vector, &vec_size);
 
-    double *result = (double *)malloc(sizeof(double) * num_rows);
-    spmv_csr(csr_rows_arr, csr_cols_arr, csr_nnz_arr, num_rows, num_cols, nnz, vector, result);
-    store_result(output_name, result, num_rows);
+    unsigned int* drp; // row pointer on GPU
+    unsigned int* dci; // col index on GPU
+    double* dv; // values on GPU
+    double* dx; // input x on GPU
+    double* db; // result b on GPU
+
+    allocate_csr_gpu(csr_rows_arr, csr_cols_arr, csr_nnz_arr, num_rows, num_cols, nnz, vector, &drp,
+                     &dci, &dv, &dx, &db);
+    //(drp, dci, dv, m, n, nnz, dx, db);
+    scalar_csr(dci, drp, dv, num_rows, num_cols, nnz, dx, db);
+
+    double* b = (double*) malloc(sizeof(double) * num_rows);
+    get_result_gpu(db, b, num_rows);
+
+    store_result(output_name, b, num_rows);
 
     /* cleanup */
     free(vector);
-    free(result);
+    free(b);
     free(coo_rows_arr);
     free(coo_cols_arr);
     free(coo_nnz_arr);

@@ -62,6 +62,12 @@ void allocate_coo_gpu(unsigned int* row_ind, unsigned int* col_ind,
     cudaMalloc(dev_b, sizeof(double) * m);
 }
 
+void get_result_gpu(double* dev_b, double* b, int m)
+{
+    cudaMemcpy(b, dev_b, sizeof(double) * m, cudaMemcpyDeviceToHost);
+    cudaFree(dev_b);
+}
+
 __global__ void scalar_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
                         double* x, double* b) 
 {
@@ -90,15 +96,19 @@ __host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
 __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
                     double* x, double* b) 
 {
-    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    const int warp_id = tid / 32;
-    const int lane_id = threadIdx.x % 32;
+    //
+    const int warp = threadIdx.x / 32;
+    const int lane = threadIdx.x % 32;
+    const int warps_per_block = blockDim.x / 32;
+    
+    int row_idx = blockIdx.x * warps_per_block + warp; // just 1 warp per row
+    int subrow = gridDim.x * warps_per_block;
 
-    int row = warp_id; // just 1 warp per row
+    double prod = 0.0;
 
-    if (row < m) {
-        double prod = 0;
-        for (int idx = row_ptr[row] + lane_id; idx < row_ptr[row + 1]; idx += 32) {
+    for (int row = row_idx; row < m; row += subrow) {
+        prod = 0.0;
+        for (int idx = row_ptr[row] + lane; idx < row_ptr[row + 1]; idx += 32) {
             prod += vals[idx] * x[col_ind[idx]];
         }
 
@@ -107,7 +117,7 @@ __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, 
             prod += __shfl_down_sync(0xffffffff, prod, offset);
         }
     
-        if (lane_id == 0) {
+        if (lane == 0) {
             b[row] += prod;
         }
     }
@@ -117,11 +127,10 @@ __host__ void vector_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
                     double* x, double* b) 
 {
     int threads_per_block = 256;
-    dim3 block(threads_per_block);
-    int blocks_per_grid = (m + threads_per_block - 1) / threads_per_block;
-    dim3 grid(blocks_per_grid);
-
-    vector_csr_kernel<<<grid, block>>>(col_ind, row_ptr, vals, m, n, nnz, x, b);
+    int warps_per_block = threads_per_block / 32;
+    int blocks_per_grid = (m + warps_per_block - 1) / warps_per_block;
+    
+    vector_csr_kernel<<<blocks_per_grid, threads_per_block>>>(col_ind, row_ptr, vals, m, n, nnz, x, b);
 }
 
 __global__ void scalar_coo_kernel(unsigned int* col_ind, unsigned int* row_ind, double* vals, int m, int n, int nnz, 
@@ -146,7 +155,6 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
                         double *x, double *b)
 {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    const int warp_id = tid / 32;
     const int lane_id = threadIdx.x % 32;
     int ind;
 
@@ -175,9 +183,8 @@ __host__ void vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *v
                         double *x, double *b)
 {
     int threads_per_block = 256;
-    dim3 block(threads_per_block);
-    int blocks_per_grid = (m + threads_per_block - 1) / threads_per_block;
-    dim3 grid(blocks_per_grid);
-
-    vector_coo_kernel<<<grid, block>>>(col_ind, row_ind, vals, m, n, nnz, x, b);
+    int warps_per_block = threads_per_block / 32;
+    int blocks_per_grid = (m + warps_per_block - 1) / warps_per_block;
+    
+    vector_coo_kernel<<<blocks_per_grid, threads_per_block>>>(col_ind, row_ind, vals, m, n, nnz, x, b);
 }
