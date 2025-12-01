@@ -1,0 +1,41 @@
+Matrix file name: cant/cant.mtx ... file loaded.
+Converting COO to CSR...done
+Vector file name: cant/b.mtx ... file loaded
+Executing GPU CSR SpMV ... 
+Executing GPU ELL SpMV ... 
+Executing GPU SELL-C-Sigma SpMV ... 
+Executing GPU CSR5 SpMV ... 
+Executing GPU CSR5 SpMV (PART 2)... 
+number of tiles is 1987
+Allocated with pitch: 508928 bytes
+First column: csr5[1][0] = -0.00
+First column: csr5[2][0] = -600.96
+Kernel: Writing og_val[0]=881.41 to csr5[0][0]
+Kernel: Writing og_val[1]=300.48 to csr5[0][1]
+Kernel: Writing og_val[2]=881.41 to csr5[0][2]
+Kernel: Writing og_val[3]=300.48 to csr5[0][3]
+Kernel: Writing og_val[4]=300.48 to csr5[0][4]
+First column: csr5[0][0] = 881.41
+Kernel completed: assigned 2034917 values to 32x1987 tiles
+Allocated with pitch: 254464 bytes
+First column: csr5[2][0] = 3789
+First column: csr5[1][0] = 1852
+Kernel: Writing og_val[0]=0 to csr5[0][0]
+Kernel: Writing og_val[1]=0 to csr5[0][1]
+Kernel: Writing og_val[2]=1 to csr5[0][2]
+Kernel: Writing og_val[3]=0 to csr5[0][3]
+Kernel: Writing og_val[4]=1 to csr5[0][4]
+First column: csr5[0][0] = 0
+Kernel completed: assigned 2034917 values to 32x1987 tiles
+2-Norm between CPU and GPU answers: 8.493476e-11
+Result file name: ./test.mtx ... file saved
+Module		Time
+Load		1.011915
+Convert		0.653030
+CPU SpMV	0.008529
+GPU Alloc	0.273901
+GPU SpMV	0.005743
+GPU ELL SpMV	0.005690
+GPU SELL-C SpMV	0.002183
+GPU CSR5 SpMV	0.008394
+Store		0.032667

@@ -12,15 +12,17 @@ extern "C" {
 #define CSR5_OMEGA 32
 #define CSR5_SIGMA 16
 
+	//puts csr values onto value gpu tiles
 __global__ void assign_csr5_val(double* og_val,
                 int sigma, int omega,
                 double* csr5_val, size_t pitch_val,
                 int nnz, int num_tiles);
 
-/*assign_csr5_col(double* og_col,
-                int* sigma, int* omega,
-                double**csr5_col, size_t pitch_col,
-                int* nnz, int* num_tiles);*/
+	//puts csr col idxs on col gpu tiles
+__global__ void assign_csr5_col(int* og_col,
+                int sigma, int omega,
+                int* csr5_col, size_t pitch_col,
+                int nnz, int num_tiles);
 
 
 // Host-side conversion function
