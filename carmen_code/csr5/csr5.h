@@ -2,6 +2,7 @@
 #define CSR5_H
 
 #include <stdint.h> // for uint32_t, uint64_t
+#include <cuda_runtime.h>
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +11,18 @@ extern "C" {
 
 #define CSR5_OMEGA 32
 #define CSR5_SIGMA 16
+
+__global__ void assign_csr5_val(double* og_val,
+                int sigma, int omega,
+                double* csr5_val, size_t pitch_val,
+                int nnz, int num_tiles);
+
+/*assign_csr5_col(double* og_col,
+                int* sigma, int* omega,
+                double**csr5_col, size_t pitch_col,
+                int* nnz, int* num_tiles);*/
+
+
 // Host-side conversion function
 void convert_csr_to_csr5(
     int m, int n, int nnz,

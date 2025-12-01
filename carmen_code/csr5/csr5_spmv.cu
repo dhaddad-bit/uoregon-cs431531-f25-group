@@ -14,8 +14,39 @@ void check(cudaError_t result, char const* const func, const char* const file, i
     }
 }
 
+// Helper macro for 2D access
+#define MATRIX_ACCESS(ptr, pitch, row, col) \
+    ((double*)((char*)(ptr) + (row) * (pitch)))[col]
 
 
+__global__ void assign_csr5_val(double* og_val,
+		int sigma, int omega,
+		double* csr5_val, size_t pitch_val,
+		int nnz, int num_tiles)
+{
+	//attempt to assign gpu values
+	int tile_col = blockIdx.x; 
+	int tile_row = blockIdx.y;
+	int local_pos = threadIdx.x;
+	//T* pElement = (T*)((char*)BaseAddress + Row * pitch) + Column;
+	//
+	int global_idx = (tile_row * num_tiles + tile_col) * sigma + local_pos;
+
+	if (global_idx < nnz){
+		int target_row = tile_row;
+		int target_col = tile_col*sigma + local_pos;
+
+		MATRIX_ACCESS(csr5_val, pitch_val, target_row, target_col) = og_val[global_idx];
+
+	}
+	/*for (int i = 0; i < (*omega); i++){
+		for (int j = 0; j < ((*sigma)*(*num_tiles)); j++){
+     		
+		double new_value = og_val[i];
+		MATRIX_ACCESS(gpu_csr5_val, pitch, row, col) = new_value;
+		}
+    }*/
+}
 
 void convert_csr_to_csr5_gpu(
     //Inputs
@@ -39,10 +70,29 @@ void convert_csr_to_csr5_gpu(
                    (*omega) * (*num_tiles) * sizeof(double),  // width in BYTES
                    *sigma);                                   // height in rows
         printf("Allocated with pitch: %zu bytes\n", pitch_val);
-    	// Store the actual pitch if needed
-   	// *omega = pitch / sizeof(double);  // Convert pitch back to elements if needed
-    
-    	// Similarly allocate other 2D arrays
+	//    T* pElement = (T*)((char*)BaseAddress + Row * pitch) + Column; 
+	//   ^^ address of row, col of any element is given as above ^^
+    	double* d_og_val;
+    	cudaMalloc(&d_og_val, nnz * sizeof(double));
+    	cudaMemcpy(d_og_val, og_val, nnz * sizeof(double), cudaMemcpyHostToDevice);
+    	
+	//ASSIGNING VALUES - LAUNCH KERNEL with <<< >>>
+	dim3 blocks(*num_tiles, *omega);  // grid dimensions
+	dim3 threads(*sigma);             // block dimensions
+	    
+	assign_csr5_val<<<blocks, threads>>>(
+		d_og_val, 
+		*sigma, *omega, 
+		*gpu_csr5_val, pitch_val, 
+		nnz, *num_tiles
+	);
+	    
+	cudaDeviceSynchronize();  // waaait for kernel to finish
+	    
+	// Cleanup temporary GPU memory
+	cudaFree(d_og_val);
+
+	// Similarly allocate other 2D arrays
     	cudaMallocPitch((void**)gpu_csr5_col_idx, &pitch_col, 
                    (*omega) * (*num_tiles) * sizeof(int), 
                    *sigma);
@@ -56,10 +106,12 @@ void convert_csr_to_csr5_gpu(
 	//also mempry for the tile ptr
 	cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles)*sizeof(int));//maybe this should be unsigned int though
 
-	
-    
-
-
+	//ASSIGNING VALUES
+	assign_csr5_val<<<blocks, threads>>>(
+			d_og_val, *sigma, 
+			*omega, *gpu_csr5_val, 
+			pitch_val, nnz, *num_tiles
+			);
 }
 
 
