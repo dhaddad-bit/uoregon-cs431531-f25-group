@@ -1,0 +1,18 @@
+GPU 0: NVIDIA L40S (UUID: GPU-d04e5db2-a4f7-c711-6bb9-b8ef56c1b4c6)
+==PROF== Connected to process 1174215 (/home/sgreenvoss/proj/uoregon-cs431531-f25-group/stella_code/new_logging/davids_impl/spmv)
+==PROF== Profiling "spmv_kernel" - 0: 0%....50%....100% - 40 passes
+==PROF== Profiling "spmv_kernel_ell" - 1: 0%....50%....100% - 40 passes
+==PROF== Profiling "spmv_sell_c_kernel" - 2: 0%....50%....100% - 40 passes
+==PROF== Profiling "spmv_csr5_kernel" - 3: 0%....50%....100% - 40 passes
+==PROF== Profiling "spmv_csr5_kernel" - 4: 0%....50%....100% - 40 passes
+==PROF== Profiling "spmv_csr5_kernel" - 5: 0%....50%....100% - 40 passes
+Matrix file name: matrices//cant/cant.mtx ... Calculating CPU CSR SpMV ... Executing GPU CSR SpMV ... 
+cant.mtx,CSR,32,1.096266968,0.000000000,0.0073,0.0452,1.830217e-10
+Executing GPU ELL SpMV ... 
+cant.mtx,ELL,32,0.548296143,0.000000000,0.0146,0.0904,1.830217e-10
+Executing GPU SELL-C-Sigma SpMV ... 
+cant.mtx,SELL-C-Sigma,32,0.551452637,0.000000000,0.0145,0.0899,1.195589e-10
+Executing GPU CSR5 SpMV ... 
+cant.mtx,CSR5,32,0.579469299,0.000000000,0.0138,0.0856,7.723135e-11
+==PROF== Disconnected from process 1174215
+==PROF== Report: /home/sgreenvoss/proj/uoregon-cs431531-f25-group/stella_code/new_logging/davids_impl/profile_report.ncu-rep
