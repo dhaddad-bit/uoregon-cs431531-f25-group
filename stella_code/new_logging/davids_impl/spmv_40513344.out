@@ -1,0 +1,17 @@
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 3094646 (/gpfs/home/dhaddad/uoregon-cs431531-f25-group/stella_code/new_logging/davids_impl/spmv)
+==WARNING== Unable to access the following 8 metrics: pcie__read_bytes.avg.per_second, pcie__read_bytes.max.per_second, pcie__read_bytes.min.per_second, pcie__read_bytes.sum.per_second, pcie__write_bytes.avg.per_second, pcie__write_bytes.max.per_second, pcie__write_bytes.min.per_second, pcie__write_bytes.sum.per_second. If profiling on a MIG instance, it is not possible to collect metrics from GPU units that are shared with other MIG instances.
+
+==PROF== Profiling "spmv_kernel" - 0: 0%....50%....100% - 47 passes
+==PROF== Profiling "spmv_kernel_ell" - 1: 0%....50%....100% - 47 passes
+==PROF== Profiling "spmv_sell_c_kernel" - 2: 0%....50%....100% - 47 passes
+==PROF== Profiling "spmv_csr5_kernel" - 3: 0%....50%....100% - 47 passes
+==PROF== Profiling "spmv_csr5_kernel" - 4: 0%....50%....100% - 47 passes
+==PROF== Profiling "spmv_csr5_kernel" - 5: 0%....50%....100% - 47 passes
+cant.mtx,CSR,32,1.210201416,0.000000000,0.0066,0.0410,1.830217e-10
+cant.mtx,ELL,32,0.511291779,0.000000000,0.0157,0.0970,1.830217e-10
+cant.mtx,SELL-C-Sigma,32,0.717928040,0.000000000,0.0112,0.0691,1.195589e-10
+cant.mtx,CSR5,32,0.751857666,0.000000000,0.0107,0.0660,7.723135e-11
+==PROF== Disconnected from process 3094646
+==PROF== Report: /gpfs/home/dhaddad/uoregon-cs431531-f25-group/stella_code/new_logging/davids_impl/profile_report.ncu-rep
