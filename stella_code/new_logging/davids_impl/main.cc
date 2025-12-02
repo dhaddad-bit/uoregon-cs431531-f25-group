@@ -18,7 +18,6 @@
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
-#define MAX_ITER 100
 
 #define NUM_TIMERS       9
 #define LOAD_TIME        0
@@ -30,6 +29,7 @@
 #define STORE_TIME       6
 #define GPU_SELL_C_TIME  7
 #define GPU_CSR5_TIME    8
+#define LOGGING
 
 double calc_diff(int m, const double* r1, const double* r2) {
     double diff = 0.0;
@@ -42,13 +42,15 @@ double calc_diff(int m, const double* r1, const double* r2) {
 
 
 void log_csv(char* matrix, const char* name, int config, double time_s, double conv_s, int nnz, int m, int n, double err) {
-   // GFLOPS = (2 * nnz ops) / (time in seconds) / 10^9
+#ifdef LOGGING
+     	// GFLOPS = (2 * nnz ops) / (time in seconds) / 10^9
     double gflops = (2.0 * nnz) / (time_s * 1e9);
 
     // Effective Bandwidth (APproximation) THIS IS WHAT WE CARE ABOUT!
     double bytes = (nnz * 12.0) + (m * 16.0) + (n * 8.0); // CSR: val (8 bytes) + col_idx (4 bytes) + row_ptr (4 bytes) + x (8 bytes) + y (8 bytes)
     double gbps = bytes / (time_s * 1e9);
     fprintf(stdout, "%s,%s,%d,%.9f,%.9f,%.4f,%.4f,%e\n", matrix, name, config, time_s, conv_s, gflops, gbps, err);
+#endif
 }
 
 // --- Sell-C-sigma conversion function --- 
@@ -157,7 +159,6 @@ int main(int argc, char** argv) {
 
     // Initialize timess
     double timer[NUM_TIMERS];
-    double time;
     uint64_t t0;
     for(unsigned int i = 0; i < NUM_TIMERS; i++) {
         timer[i] = 0.0;
@@ -189,7 +190,6 @@ int main(int argc, char** argv) {
     int *col_ind;
     double *val;
     float time_ms; // Variable to capture kernel GPU time
-//    fprintf(stdout, "Matrix file name: %s ... ", matrixName);
     t0 = ReadTSC();
     
     ret = mm_read_mtx_crd(matrixName, &m, &n, &nnz, &row_ind, &col_ind, &val, 
@@ -209,6 +209,7 @@ int main(int argc, char** argv) {
     t0 = ReadTSC();
     convert_coo_to_csr(row_ind, col_ind, val, m, n, nnz,
                        &csr_row_ptr, &csr_col_ind, &csr_vals);
+    
     unsigned int* ell_col_ind = NULL;
     double* ell_vals = NULL;
     int n_new = 0;
@@ -238,28 +239,50 @@ int main(int argc, char** argv) {
         spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
     }
     timer[SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
-//    fprintf(stdout, "done\n");
 
-    // ==========================================
-    // Execute SPMV
-    // ==========================================
-//    fprintf(stdout, "Executing GPU CSR SpMV ... \n");
+
+    // =========================================
+    // profiling cusparse
+    // =========================================
     unsigned int* drp; // row pointer on GPU
     unsigned int* dci; // col index on GPU
     double* dv; // values on GPU
     double* dx; // input x on GPU
     double* db; // result b on GPU
-    t0 = ReadTSC();
     allocate_csr_gpu(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, &drp,
                      &dci, &dv, &dx, &db);
-    timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
+	double* h_check = (double*)malloc(sizeof(double) * m);	
+	cusparse_csr(m, n, nnz,
+                        drp, dci, dv,
+                        dx, db, &time_ms);
+	get_result_gpu(db, h_check, m);
+	cudaDeviceSynchronize();
+	double err = calc_diff(m, bb, h_check);
+
+        log_csv(mat_name, "cusparse_csr", 0, time_ms / 1000.0, 0.0, nnz, m, n, err); // figure out thread count
+
+    // ==========================================
+    // Execute SPMV
+    // ==========================================
+//    fprintf(stdout, "Executing GPU CSR SpMV ... \n");
+/*    unsigned int* drp; // row pointer on GPU
+    unsigned int* dci; // col index on GPU
+    double* dv; // values on GPU
+    double* dx; // input x on GPU
+    double* db; // result b on GPU
+    t0 = ReadTSC();
+
+    allocate_csr_gpu(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, &drp,
+                     &dci, &dv, &dx, &db);
+*/
+    // timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // Test different thread counts
     int thread_counts[] = {32, 64, 128, 256};
-    int num_tests = 1;
+    int num_tests = 4;
     
     // Temp buffer for verification
-    double* h_check = (double*)malloc(sizeof(double) * m);
+    h_check = (double*)malloc(sizeof(double) * m);
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
 
@@ -269,11 +292,11 @@ int main(int argc, char** argv) {
         get_result_gpu(db, h_check, m);
 	cudaDeviceSynchronize();
 
-        double err = calc_diff(m, bb, h_check);
+        err = calc_diff(m, bb, h_check);
         log_csv(mat_name, "CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 //        fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
         // Only store the time for the 64-thread run in your timer array
-        if (threads == 64) timer[GPU_SPMV_TIME] += time * MAX_ITER; // convert to seconds and multiply by iterations
+ //       if (threads == 64) timer[GPU_SPMV_TIME] += time * MAX_ITER; // convert to seconds and multiply by iterations
     };
 
     // copy data back from the GPU
@@ -306,10 +329,6 @@ int main(int argc, char** argv) {
         log_csv(mat_name, "ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
 //        fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
-        // Only store the time for the 64-thread run in your timer array
-        if (threads == 64) {
-            timer[GPU_ELL_TIME] += time * MAX_ITER; // convert to seconds and multiply by iterations
-        }
     }
 
     // copy data back from the GPU
@@ -368,7 +387,9 @@ int main(int argc, char** argv) {
     cudaDeviceSynchronize();
 
     timer[GPU_SELL_C_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
-//    fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
+	#ifdef PRINT
+    fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
+    #endif
     // Unscramble and verify correctness
     double* h_y_sigma = (double*) malloc(sizeof(double) * m_padded_sell);
     cudaMemcpy(h_y_sigma, db, m * sizeof(double), cudaMemcpyDeviceToHost);
@@ -380,9 +401,11 @@ int main(int argc, char** argv) {
         // Store unscrambled result for final save file
         be[original_idx] = h_y_sigma[i];
     }
+
+#ifdef LOGGING
     log_csv(mat_name, "SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
 //    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
-
+#endif
     // Free SELL-C specific memory
     cudaFree(d_sell_slice_ptr);
     cudaFree(d_sell_col_ind);

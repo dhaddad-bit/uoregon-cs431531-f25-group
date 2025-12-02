@@ -22,10 +22,20 @@ export OMP_NUM_THREADS=28
 
 nvidia-smi -L
 
-ncu \
-  -o profile_report \
-  -f \
-  --set full \
-  --target-processes all \
-	./spmv "$MATRIX_DIR"/cant/cant.mtx "$MATRIX_DIR"/cant/b.mtx test_out/ans.mtx
-#./spmv cant/cant.mtx cant/b.mtx test_out/ans.mtx
+# set up to take avg over 100 for all 
+#ncu \
+#  -o profile_report-withcusparse \
+#  -f \
+#  --set full \
+#  --kernel-name "" \
+echo "matrix,kernel,config,time_sec,na,gflops,eff_bw,err"
+
+for item in "$MATRIX_DIR"/*; do
+	if [ -d "$item" ]; then
+		vector=$(ls "$item"/b* | head -n 1)
+		vector_base=$(basename "$vector")
+		matrix=$(ls "$item" --ignore="$vector_base" --ignore="ans*" | head -n 1)
+		matrix="$item/$matrix"
+		./spmv "$matrix" "$vector" test_out/ans.mtx
+	fi
+done

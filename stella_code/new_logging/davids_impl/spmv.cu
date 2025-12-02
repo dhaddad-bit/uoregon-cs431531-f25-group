@@ -8,8 +8,9 @@
 #include <assert.h>
 #include <cooperative_groups.h>
 #include "spmv.h"
+#include <cusparse.h>
+#include <cuda_runtime.h>
 
-#define MAX_ITER 1
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 inline void check_cuda(cudaError_t result, const char* const func, const char* const file, int const line) {
@@ -257,4 +258,66 @@ void allocate_ell_gpu(unsigned int* col_ind, double* vals, int m, int n,
     CopyData(vals, padded_nnz, sizeof(double), dev_vals);
 }
 
-// Allocate SELL-C-Sigma Data on GPU
+
+// ================ profiling cusparse ==========================
+
+
+void cusparse_csr(int m, int n, int nnz,
+                        unsigned int *row_ptr, unsigned int *col_ind, double *vals,
+                        double *d_x, double *d_b, float *time_ms) {
+        cusparseHandle_t handle;
+	cusparseCreate(&handle);
+
+        cusparseSpMatDescr_t mat;
+        cusparseDnVecDescr_t vecX, vecB;
+
+        cusparseCreateCsr(&mat,
+                          m, n, nnz,
+                          row_ptr, col_ind, vals,
+                          CUSPARSE_INDEX_32I, // not sure here
+                          CUSPARSE_INDEX_32I,
+                          CUSPARSE_INDEX_BASE_ZERO,
+                          CUDA_R_64F);
+
+        cusparseCreateDnVec(&vecX, n, d_x, CUDA_R_64F);
+        cusparseCreateDnVec(&vecB, m, d_b, CUDA_R_64F);
+
+        double alpha = 1.0, beta = 0.0;
+        size_t bufferSize = 0;
+        cusparseSpMV_bufferSize(
+                        handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                        &alpha, mat, vecX, &beta, vecB,
+                        CUDA_R_64F, CUSPARSE_SPMV_ALG_DEFAULT,
+                        &bufferSize);
+
+        void *dBuffer = NULL;
+        checkCudaErrors(cudaMalloc(&dBuffer, bufferSize));
+
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+
+        cudaEventRecord(start);
+        for (int i = 0; i < MAX_ITER; i++) {
+                cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                &alpha, mat, vecX, &beta, vecB,
+                                CUDA_R_64F, CUSPARSE_SPMV_ALG_DEFAULT,
+                                dBuffer);
+        }
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+
+        float elapsed;
+        cudaEventElapsedTime(&elapsed, start, stop);
+        *time_ms = elapsed / (float)MAX_ITER;
+
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
+
+        cudaFree(dBuffer);
+        cusparseDestroySpMat(mat);
+        cusparseDestroyDnVec(vecX);
+        cusparseDestroyDnVec(vecB);
+        cusparseDestroy(handle);
+	checkCudaErrors(cudaGetLastError());
+}

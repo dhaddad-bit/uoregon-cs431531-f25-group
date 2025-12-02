@@ -1,6 +1,8 @@
 #ifndef SPMV_H
 #define SPMV_H
 
+#define MAX_ITER 100
+
 // Make header C-compatible for C++ compilers
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +38,12 @@ void get_result_gpu(double* dev_b, double* b, int m);
 void spmv_gpu_sellc(int m, int num_slices, int SLICE_THICKNESS,
                     unsigned int* d_slice_ptr, unsigned int* d_col_ind, 
                     double* d_vals, double* d_x, double* d_y, float* time_ms);
+
+void cusparse_csr(int m, int n, int nnz,
+                        unsigned int *row_ptr, unsigned int *col_ind, double *vals,
+                        double *d_x, double *d_b, float *time_ms);
+void cusparse_coo(int m, int n, int nnz,                                                                  unsigned int *row_ind, unsigned int *col_ind, double *vals,
+                        double *d_x, double *d_b, float *time_ms);
 
 #ifdef __cplusplus
 } // extern "C"
