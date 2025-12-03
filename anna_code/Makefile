@@ -28,7 +28,7 @@ ${EXEC}: ${OBJS}
 	$(CPP) ${CCFLAGS} ${INC} -c $< -o $@ ${LIBS} ${CUDA_LD_FLAGS} ${NVCCINC}
 
 %.o : %.cu
-	$(NVCC) ${NVCCCFLAGS} ${INC} -c $< -o $@ ${CUDA_LD_FLAGS} ${NVCCFLAGS} ${NVCCINC}
+	$(NVCC) ${NVCCFLAGS} ${INC} -c $< -o $@ ${CUDA_LD_FLAGS} ${NVCCFLAGS} ${NVCCINC}
 
 clean:
 	rm -f *.o *.d *~ *.a *.so *.s ${EXEC}

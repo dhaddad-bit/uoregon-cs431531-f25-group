@@ -7,8 +7,7 @@
 
 #include "gpu_spmv.h"
 
-//Not finished yet!!!
-
+#define WARP_SIZE 32
 
 void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind, 
                       double* vals, int m, int n, int nnz, double* x, 
@@ -96,18 +95,20 @@ __host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
 __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
                     double* x, double* b) 
 {
-    //
-    const int warp = threadIdx.x / 32;
-    const int lane = threadIdx.x % 32;
+    const int warp = threadIdx.x / 32; // which warp this is
+    const int lane = threadIdx.x % 32; // place in a warp
     const int warps_per_block = blockDim.x / 32;
     
-    int row_idx = blockIdx.x * warps_per_block + warp; // just 1 warp per row
-    int subrow = gridDim.x * warps_per_block;
+    int row_idx = blockIdx.x * warps_per_block + warp; //  1 warp per row
+    int subrow = gridDim.x * warps_per_block; 
 
     double prod = 0.0;
 
+    // iterate from first element warp covers and iterate by subrow
     for (int row = row_idx; row < m; row += subrow) {
         prod = 0.0;
+
+        // add the values based on how many elements in row
         for (int idx = row_ptr[row] + lane; idx < row_ptr[row + 1]; idx += 32) {
             prod += vals[idx] * x[col_ind[idx]];
         }
@@ -154,27 +155,54 @@ __host__ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, double* v
 __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
                         double *x, double *b)
 {
-    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    const int lane_id = threadIdx.x % 32;
-    int ind;
 
-    for (ind = tid; ind < nnz; ind += 32) {
-        double val = vals[ind] * x[col_ind[ind]];
-        // segmented scan according to current row
-        int prev_row = __shfl_up_sync(0xffffffff, row_ind[ind], 1);
-        bool new_row = false;
-        if (lane_id == 0 || row_ind[ind] != prev_row) {
-            new_row = true;
+    // get thread id and lane within warp
+    const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const int lane_id = threadIdx.x % WARP_SIZE;
+
+    // iterate from first element for each thread and move up by warp 
+    for (int ind = tid; ind < nnz; ind += WARP_SIZE) {
+
+        double val = 0;
+        int curr_row = -1;
+
+        // find the value and current row
+        if (ind < nnz) {
+            val = vals[ind] * x[col_ind[ind]];
+            curr_row = row_ind[ind];
         }
-        for (int offset = 1; offset < 32; offset *= 2) {
-            double tmp = __shfl_up_sync(0xffffffff, val, offset);
-            int tmp_row = __shfl_up_sync(0xffffffff, row_ind[ind], offset);
-            if (lane_id >= offset && tmp_row == row_ind[ind]) {
-                val += tmp;
+
+        // reduce the warp to last element
+        for (int offset = 1; offset < WARP_SIZE; offset *= 2) {
+            double next_val = __shfl_up_sync(0xffffffff, val, offset);
+            int next_row = __shfl_up_sync(0xffffffff, curr_row, offset);
+
+            // add value if this not an offset lane and the same row
+            if (lane_id >= offset && curr_row == next_row) {
+                val += next_val;
             }
         }
-        if (new_row == true) {
-            atomicAdd(&b[row_ind[ind]], val);
+
+        // get the next iteration's row
+        int next_row;
+        if (ind + 1 < nnz) {
+            next_row = row_ind[ind + 1];
+        } else {
+            next_row = -1;
+        }
+        
+        // get the next row in the warp
+        int next_row_warp = __shfl_down_sync(0xffffffff, curr_row, 1);
+
+        // check if there is a new row
+        bool next_is_new_row_global = (curr_row != next_row);
+        bool next_is_new_row_warp = (curr_row != next_row_warp);
+
+        // if current thread holds final sum of row
+        // check if within bounds, and it is the last element of warp
+        // or a new row has been detected in either the next iteration or warp
+        if (ind < nnz && (lane_id == WARP_SIZE - 1 || next_is_new_row_warp || next_is_new_row_global)) {
+            atomicAdd(&b[curr_row], val);
         }
     }
 }
@@ -183,8 +211,7 @@ __host__ void vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *v
                         double *x, double *b)
 {
     int threads_per_block = 256;
-    int warps_per_block = threads_per_block / 32;
-    int blocks_per_grid = (m + warps_per_block - 1) / warps_per_block;
-    
+    int blocks_per_grid = (nnz + threads_per_block - 1) / threads_per_block; // blocks based on nnz
+
     vector_coo_kernel<<<blocks_per_grid, threads_per_block>>>(col_ind, row_ind, vals, m, n, nnz, x, b);
 }

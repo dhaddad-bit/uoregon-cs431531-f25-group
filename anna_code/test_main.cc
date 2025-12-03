@@ -8,10 +8,16 @@
 #include "mmio.h"
 #include "gpu_spmv.h"
 
-/*
-*/
+#include <algorithm> // for std::sort
+#include <vector>
 
 #define MAX_LEN 100
+
+struct COOEntry {
+    unsigned int row;
+    unsigned int col;
+    double val;
+};
 
 void read_vector(const char *file, double **vector, int *size) {
 
@@ -255,6 +261,32 @@ int main(int argc, char *argv[]) {
 
     double* b = (double*) malloc(sizeof(double) * num_rows);
     get_result_gpu(db, b, num_rows);
+
+    // // if using vector COO: sort the arrays and change to 0-index
+
+    // std::vector<COOEntry> coo_vec(nnz);
+    // for (int i = 0; i < nnz; i++) {
+    //     coo_vec[i].row = coo_rows_arr[i] - 1; // 0-based
+    //     coo_vec[i].col = coo_cols_arr[i] - 1; // 0-based
+    //     coo_vec[i].val = coo_nnz_arr[i];
+    // }
+
+    // std::sort(coo_vec.begin(), coo_vec.end(), [](const COOEntry &a, const COOEntry &b) {
+    //     return a.row < b.row;
+    // });
+
+    // for (int i = 0; i < nnz; i++) {
+    //     coo_rows_arr[i] = coo_vec[i].row;
+    //     coo_cols_arr[i] = coo_vec[i].col;
+    //     coo_nnz_arr[i] = coo_vec[i].val;
+    // }
+
+    // allocate_coo_gpu(coo_rows_arr, coo_cols_arr, coo_nnz_arr, num_rows, num_cols, nnz, vector, 
+    //                 &dri, &dci, &dv, &dx, &db);
+
+    // vector_coo(dci, dri, dv, num_rows, num_cols, nnz, dx, db);
+    // double* b = (double*) malloc(sizeof(double) * num_rows);
+    // get_result_gpu(db, b, num_rows);
 
     store_result(output_name, b, num_rows);
 
