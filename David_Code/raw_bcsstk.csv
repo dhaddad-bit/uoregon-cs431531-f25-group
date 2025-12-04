@@ -1,0 +1,8 @@
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed","gpu__time_duration.sum"
+"","","","","","","","","","","","%","usecond"
+"0","3671469","spmv","127.0.0.1","void spmv_kernel<double>(unsigned int *, unsigned int *, T1 *, int, int, int, double *, double *)","1","7","(32, 1, 1)","(11948, 1, 1)","0","8.0","40.936422","68.608000"
+"1","3671469","spmv","127.0.0.1","void spmv_kernel_ell<double>(unsigned int *, T1 *, int, int, int, double *, double *)","1","7","(32, 1, 1)","(11948, 1, 1)","0","8.0","33.600225","81.952000"
+"2","3671469","spmv","127.0.0.1","spmv_sell_c_kernel(int, int, int, const unsigned int *, const unsigned int *, const double *, const double *, double *)","1","7","(32, 1, 1)","(374, 1, 1)","0","8.0","33.197650","10.528000"
+"3","3671469","spmv","127.0.0.1","spmv_csr5_kernel(int, const double *, const int *, const int *, const int *, const unsigned int *, const double *, double *)","1","7","(32, 1, 1)","(292, 1, 1)","0","8.0","79.897949","29.120000"
+"4","3671469","spmv","127.0.0.1","spmv_csr5_kernel(int, const double *, const int *, const int *, const int *, const unsigned int *, const double *, double *)","1","7","(32, 1, 1)","(292, 1, 1)","0","8.0","79.769809","29.152000"
+"5","3671469","spmv","127.0.0.1","spmv_csr5_kernel(int, const double *, const int *, const int *, const int *, const unsigned int *, const double *, double *)","1","7","(32, 1, 1)","(292, 1, 1)","0","8.0","80.031038","29.088000"
