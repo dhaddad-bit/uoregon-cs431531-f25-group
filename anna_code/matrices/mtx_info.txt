@@ -12,6 +12,19 @@ bcsstk18:
 
     Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/bcsstruc2/bcsstk18.html
 
+cant:
+      Type: real symmetric positive definite
+      Size: 62451 x 62451
+
+      Name: Williams/cant
+            [FEM/Cantilever: FEM cantilever.  Williams et al.]
+
+      Source: unknown
+      Discipline: 2D/3D problem
+      Accession: 2008
+
+      Link: https://sparse.tamu.edu/Williams/cant
+
 e40r5000:
     Type: real unsymmetric
     Size: 17281 x 17281
@@ -51,3 +64,66 @@ plsk1919:
     Accession:	Summer 1975
 
     Link: https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/platz/plsk1919.html
+
+stokes:
+      Type: real unsymmetric
+      Size: 11,449,533 x 11,449,533
+
+      Name: VLSI: semiconductor device and process simulation
+
+      Source: Anonymous
+      Discipline: semiconductor process problem
+      Accession: 2018
+
+      Link: https://sparse.tamu.edu/VLSI/stokes
+
+atmosmodm:
+      ** vector from same source! **
+      Type: integer unsymmetric
+      Size: 1,489,752 x 1,489,752
+
+      Name: Atmospheric models, Andrei Bourchtein
+
+      Source: A. Bourchtein
+      Discipline: Computational fluid dynamics problem
+      Accession: 2009
+
+      Link: https://sparse.tamu.edu/Bourchtein/atmosmodm
+
+
+knlpkkt200:
+      Type: real symmetric
+      Size: 16,240,000 x 16,240,000
+
+      Name: Symmetric indefinite KKT matrix, O. Schenk, Univ. of Basel
+
+      Source: O. Schenk, A. Waechter, M. Weiser
+      Discipline: Optimization problem
+      Accession: 2008
+
+      Link: https://sparse.tamu.edu/Schenk/nlpkkt200
+
+tx2010:
+      Type: integer symmetric
+      Size: 914,231 x 914,231
+
+      Name: DIMACS10 set: redistrict/tx2010 and tx2010a
+
+      Source: W. Zhao
+      Discipline: Undirected weighted graph
+      Accession: 2010
+
+      Link: https://sparse.tamu.edu/DIMACS10/tx2010
+
+mawi_201512020030: 
+      Type: integer symmetric
+      Size: 68,863,315 x 68,863,315
+
+      Name: MAWI Working Group Traffic Archive: graph 201512020030
+
+      Source: MAWI
+      Discipline: Undirected weighted graph (network traffic)
+      Accession: 2015
+
+      Link: https://sparse.tamu.edu/MAWI/mawi_201512020030
+
