@@ -172,11 +172,10 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
         val = 0.0;
     }
 
-    // using a while loop to follow more closely to pseudocode
     while (ind < nnz) {
 
         int next_ind = ind + WARP_SIZE;
-        int next_row = (next_ind < nnz ? row_ind[next_ind] : row);
+        int next_row = (next_ind < nnz ? row_ind[next_ind] : -1);
 
         // segment will end if any lane sees different next_row
         bool bound_next_iter = __any_sync(0xffffffff, next_row != row);
@@ -188,27 +187,29 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
         // if change rows in this or next iteration, need to flush sums
         if ((bound_warp || bound_next_iter) && row >= 0) {
             // segmented scan
-            double acc = val;
+
             for (int offset = 1; offset < WARP_SIZE; offset *= 2) {
-                double tmp_val = __shfl_up_sync(0xffffffff, acc, offset);
+                double tmp_val = __shfl_up_sync(0xffffffff, val, offset);
                 int tmp_row = __shfl_up_sync(0xffffffff, row, offset);
                 if (lane_id >= offset && tmp_row == row) {
-                    acc += tmp_val;
+                    val += tmp_val;
                 }
             }
 
             // segment leader writes result
             int row_up = __shfl_up_sync(0xffffffff, row, 1);
             if ((lane_id == 0 || row != row_up) && row >= 0) {
-                atomicAdd(&b[row], acc);
+                atomicAdd(&b[row], val);
             }
+
+            val = 0.0;
         }
 
         ind = next_ind;
         row = next_row;
 
         if (ind < nnz) {
-            val = vals[ind] * x[col_ind[ind]];
+            val += vals[ind] * x[col_ind[ind]];
         } else {
             val = 0.0;
         }
