@@ -1,0 +1,82 @@
+#!/bin/bash
+# on Talapas, this must be cis431_531.
+
+#SBATCH --account=sgreenvoss
+
+#SBATCH --job-name=spmv_batch 
+#SBATCH --output=batch_job_%j.log
+
+# if ORCA, the below will be short. else, use gpu
+#SBATCH --partition=short
+
+#SBATCH --time=00:30:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=28
+
+module load cuda
+
+export OMP_PROC_BIND=true
+export OMP_NUM_THREADS=28
+
+export EXEC_DIR="bin"
+
+# 1. Create a directory to store clean CSV outputs
+mkdir -p results
+
+# 2. List of matrices to process
+MATRICES=(
+    "cant"
+    "bcsstk" 
+    "e40r5000" 
+    "name131" 
+    "plsk1919"
+)
+
+echo $(pwd)
+
+# 3. Loop through each matrix
+for NAME in "${MATRICES[@]}"; do
+    echo "----------------------------------------------------------------"
+    echo "Processing Matrix: $NAME"
+    echo "----------------------------------------------------------------"
+    
+    # ./matrices/NAME/NAME.mtx AND ./matrices/NAME/b_NAME.mtx
+    MAT_FILE="matrices/${NAME}/${NAME}.mtx"
+    VEC_FILE="matrices/${NAME}/b_${NAME}.mtx"
+
+    # Special check for 'cant' if it uses the old simple 'b.mtx' name
+    if [ "$NAME" == "cant" ]; then
+        if [[ ! -f "$VEC_FILE" ]]; then
+             VEC_FILE="matrices/${NAME}/b.mtx"
+        fi
+        # Fallback if cant is still in the root folder
+        if [[ ! -f "$MAT_FILE" ]]; then
+             MAT_FILE="cant/cant.mtx"
+             VEC_FILE="cant/b.mtx"
+        fi
+    fi
+
+    # Check if files exist before running to prevent segfaults
+    if [[ -f "$MAT_FILE" && -f "$VEC_FILE" ]]; then
+        
+        echo "  Input:  $MAT_FILE"
+        echo "  Vector: $VEC_FILE"
+        echo "  Output: results/${NAME}.out"
+        
+        # Run the benchmark
+        # We pipe the output to a specific file: results/NAME.out
+        $EXEC_DIR/spmv "$MAT_FILE" "$VEC_FILE" "results/${NAME}_result.mtx" > "results/${NAME}.out"
+        
+        echo "Done."
+    else
+        echo "ERROR: Could not find files for $NAME"
+        echo "  Looked for: $MAT_FILE"
+        echo "  Looked for: $VEC_FILE"
+        # Debug: list directory to see what IS there
+        echo "  Listing matrices/${NAME}:"
+        ls "matrices/${NAME}"
+    fi
+    echo ""
+done
