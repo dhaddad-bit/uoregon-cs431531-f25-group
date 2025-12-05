@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <cuda_runtime.h>
+#include <cstdint>
 
 #include "main.h"
 #include "spmv.h"
@@ -66,6 +67,21 @@ int find_sigma(int nnz, int rows){
 	else if ((nnz/rows) < t) return u;	
 	return r; //incase something horrible happens ig
 }
+
+//just do it in cpu first geez
+void make_tile_desc(int rows, int omega, int sigma, unsigned int **csr_row_ptr, 
+		uint8_t **bit_flag_array, int **y_offset_array, 
+		int **seg_offset_array, int **empty_offset_array){
+	
+
+	for (int i = 0; i < (rows + 1); i++){
+		
+
+	}
+
+
+}
+
 
 // --- Sell-C-sigma conversion function --- 
 extern "C" void convert_csr_to_sell_c_sigma(
@@ -478,19 +494,27 @@ int main(int argc, char** argv) {
     int* gpu_csr5_col_idx = NULL;
     int* gpu_csr5_row_idx = NULL;
     int* gpu_csr5_tile_ptr = NULL;
-    unsigned int* gpu_csr5_tile_desc = NULL;
+    uint8_t* gpu_csr5_bit_flag = NULL;
 	
     int sigma = find_sigma(nnz, m);
 	//fprintf(stdout, "sigma is %d\n", sigma);     
     int num_tiles_p = std::ceil(nnz/(omega*sigma));
     	fprintf(stdout, "number of tiles is %d\n", num_tiles_p);
 	
+    uint8_t* bit_flag_array = NULL;
+    int* y_off_array = NULL;
+    int* seg_off_array = NULL;
+    int* empty_array = NULL;
+    make_tile_desc(m, omega, sigma, &csr_row_ptr, 
+		  &bit_flag_array, &y_off_array, 
+		  &seg_off_array, &empty_array);
+
     //host wowow
     t0 = ReadTSC();
     convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
 		        &sigma, &omega,  
                         &num_tiles_p, &gpu_csr5_vals, &h_csr5_col_idx, 
-                        &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_tile_desc);
+                        &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_bit_flag);
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation

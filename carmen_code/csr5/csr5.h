@@ -24,6 +24,10 @@ __global__ void assign_csr5_col(int* og_col,
                 int* csr5_col, size_t pitch_col,
                 int nnz, int num_tiles);
 
+__global__ void gen_tile_ptr(int* tile_ptr,
+		int sigma, int omega, 
+		int* row_ptr);
+
 
 // Host-side conversion function
 void convert_csr_to_csr5(
@@ -68,7 +72,7 @@ void convert_csr_to_csr5_gpu(
     int** h_csr5_col_idx,
     int** h_csr5_row_idx, 
     int** h_csr5_tile_ptr,
-    uint32_t** h_csr5_tile_desc
+    uint8_t** h_csr5_tile_desc
 );
 
 
