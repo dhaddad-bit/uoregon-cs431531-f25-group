@@ -136,8 +136,14 @@ __host__ void vector_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
 __global__ void scalar_coo_kernel(unsigned int* col_ind, unsigned int* row_ind, double* vals, int m, int n, int nnz, 
                     double* x, double* b) 
 {
-    for (int i = 0; i < nnz; i++) {
-        b[row_ind[i]] += vals[i] * x[col_ind[i]];
+    int ind = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (ind < nnz) {
+        int row = row_ind[ind];
+        int col = col_ind[ind];
+        double val = vals[ind];
+
+        atomicAdd(&b[row], val * x[col]);
     }
 }
 
@@ -150,6 +156,27 @@ __host__ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, double* v
     dim3 grid(blocks_per_grid);
     scalar_coo_kernel<<<grid, block>>>(col_ind, row_ind, vals, m, n, nnz, x, b);
 }
+
+/*
+Algorithm 1. Load-balancing COO kernel algorithm.
+1: Get ind = index of the first element to be processed by this thread
+2: Get current row = rowidx[ind].
+3: Compute the first value c = A[ind] × x[colidx[ind]]
+4: for i = 0 .. nz per warp; i+ = warpsize do
+5:      Compute next row, row index of the next element to be processed
+6:      if any thread in the warp’s next row != current row or it is the final iteration
+    then
+7:          Compute the segmented scan according to current row.
+8:          if first thread in segment then
+9:              atomicAdd c on output vector by the first entry of each segment
+10:         end if
+11:         Reinitialize c = 0
+12:     end if
+13:     Get the next index ind
+14:     Compute c+ = A[ind] × x[colidx[ind]]
+15:     Update current row to next row
+16: end for
+*/
 
 __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
                         double *x, double *b)
@@ -186,8 +213,8 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
 
         // if change rows in this or next iteration, need to flush sums
         if ((bound_warp || bound_next_iter) && row >= 0) {
-            // segmented scan
 
+            // segmented scan
             for (int offset = 1; offset < WARP_SIZE; offset *= 2) {
                 double tmp_val = __shfl_up_sync(0xffffffff, val, offset);
                 int tmp_row = __shfl_up_sync(0xffffffff, row, offset);
@@ -197,8 +224,8 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
             }
 
             // segment leader writes result
-            int row_up = __shfl_up_sync(0xffffffff, row, 1);
-            if ((lane_id == 0 || row != row_up) && row >= 0) {
+            int row_up = __shfl_down_sync(0xffffffff, row, 1);
+            if (lane_id == 0 && row >= 0) {
                 atomicAdd(&b[row], val);
             }
 
