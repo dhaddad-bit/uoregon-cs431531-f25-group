@@ -13,6 +13,8 @@
 #include "spmv.h"
 #include "common.h"
 #include "csr5.h"
+#include "gpu_spmv.h"
+
 
 #include <string>
 
@@ -201,22 +203,6 @@ int main(int argc, char** argv) {
     }
     timer[LOAD_TIME] += ElapsedTime(ReadTSC() - t0);
 
-    
-    // Convert co-ordinate format to CSR format
-    unsigned int* csr_row_ptr = NULL; 
-    unsigned int* csr_col_ind = NULL;  
-    double* csr_vals = NULL; 
-    t0 = ReadTSC();
-    convert_coo_to_csr(row_ind, col_ind, val, m, n, nnz,
-                       &csr_row_ptr, &csr_col_ind, &csr_vals);
-    
-    unsigned int* ell_col_ind = NULL;
-    double* ell_vals = NULL;
-    int n_new = 0;
-    convert_csr_to_ell(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz,
-                       &ell_col_ind, &ell_vals, &n_new);
-    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
-
     // Load the input vector x 
     char vectorName[MAX_FILENAME];
     strcpy(vectorName, argv[2]);
@@ -226,86 +212,115 @@ int main(int argc, char** argv) {
     read_vector(vectorName, &x, &vector_size);
     timer[LOAD_TIME] += ElapsedTime(ReadTSC() - t0);
     assert(n == vector_size);
-//    fprintf(stdout, "file loaded\n");
-
-    // ==========================================
-    // Calculate CPU SPMV (benchmark/correctness))
-    // ==========================================
-    double* bb = (double*) malloc(sizeof(double) * m);
-    assert(bb);
-//    fprintf(stdout, "Calculating CPU CSR SpMV ... ");
-    t0 = ReadTSC();
-    for(unsigned int i = 0; i < MAX_ITER; i++) {
-        spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
-    }
-    timer[SPMV_TIME] += ElapsedTime(ReadTSC() - t0);
 
     unsigned int* drp; // row pointer on GPU
     unsigned int* dci; // col index on GPU
     double* dv; // values on GPU
     double* dx; // input x on GPU
     double* db; // result b on GPU
-    allocate_csr_gpu(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, &drp,
-                     &dci, &dv, &dx, &db);
-	double* h_check;
-
+    double* h_check; // buffer for verification
 	double err;
+    
+    // initializing where to store the different formats' arrays
+    unsigned int* csr_row_ptr = NULL; 
+    unsigned int* csr_col_ind = NULL;  
+    double* csr_vals = NULL; 
+    unsigned int* ell_col_ind = NULL;
+    double* ell_vals = NULL;
+    int n_new = 0;
 
+    unsigned int * u_row_ind = (unsigned int *) malloc(sizeof(unsigned int) * nnz);
+    unsigned int * u_col_ind = (unsigned int *) malloc(sizeof(unsigned int) * nnz);
+    for (int i = 0; i < nnz; i++) {
+        u_row_ind[i] = (unsigned int) row_ind[i];
+        u_col_ind[i] = (unsigned int) col_ind[i];
+    }
+
+    // Convert coordinate format to CSR and ELL formats
+    convert_coo_to_csr(row_ind, col_ind, val, m, n, nnz,
+                       &csr_row_ptr, &csr_col_ind, &csr_vals);
+    convert_csr_to_ell(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz,
+                        &ell_col_ind, &ell_vals, &n_new);
+    
+    // ==========================================
+    // Calculate CPU SPMV (benchmark/correctness))
+    // ==========================================
+    double* bb = (double*) malloc(sizeof(double) * m); assert(bb);
+    for(unsigned int i = 0; i < MAX_ITER; i++) {
+        spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
+    }
+
+    // ===========================================
+    // Calculate COO on GPU
+    // ===========================================
+    h_check = (double*)malloc(sizeof(double) * m);
+
+    // allocate_coo_gpu(u_row_ind, u_col_ind, val, m, n, nnz, x, 
+    //                  &drp, &dci, &dv, &dx, &db);
+
+    // scalar_coo(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb, &time_ms);
+
+    // get_result_gpu(db, h_check, m);
+	// cudaDeviceSynchronize();
+    // // check that COO is correct
+    // err = calc_diff(m, bb, h_check);
+    // log_csv(mat_name, "COO", 32, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
 
     // ==========================================
-    // Execute SPMV
+    // Execute CSR SPMV
     // ==========================================
-//    fprintf(stdout, "Executing GPU CSR SpMV ... \n");
-/*    unsigned int* drp; // row pointer on GPU
-    unsigned int* dci; // col index on GPU
-    double* dv; // values on GPU
-    double* dx; // input x on GPU
-    double* db; // result b on GPU
-    t0 = ReadTSC();
 
     allocate_csr_gpu(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, &drp,
                      &dci, &dv, &dx, &db);
-*/
-    // timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // Test different thread counts
     int thread_counts[] = {32, 64, 128, 256};
     int num_tests = 4;
     
-    // Temp buffer for verification
-    h_check = (double*)malloc(sizeof(double) * m);
+    // initial csr
     for (int i = 0; i < num_tests; i++) {
         int threads = thread_counts[i];
 
         spmv_gpu(drp, dci, dv, m, n, nnz, dx, db, threads, &time_ms);
 
-	// Verify and log
         get_result_gpu(db, h_check, m);
 	    cudaDeviceSynchronize();
 
         err = calc_diff(m, bb, h_check);
-        log_csv(mat_name, "CSR", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
-//        fprintf(stdout, " CSR Threads: %d, Time (ms): %f ms\n", threads, time_ms);
-        // Only store the time for the 64-thread run in your timer array
- //       if (threads == 64) timer[GPU_SPMV_TIME] += time * MAX_ITER; // convert to seconds and multiply by iterations
+        log_csv(mat_name, "CSR-v1", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
     };
 
-    // copy data back from the GPU
-    double* b = (double*) malloc(sizeof(double) * m);;
-    assert(b);
-    t0 = ReadTSC();
-    get_result_gpu(db, b, m);
-    timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
+    // scalar csr
+    for (int i = 0; i < num_tests; i++) {
+        int threads = thread_counts[i];
 
+        scalar_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
+
+        get_result_gpu(db, h_check, m);
+	    cudaDeviceSynchronize();
+
+        err = calc_diff(m, bb, h_check);
+        log_csv(mat_name, "CSR-SC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+    };
+
+    for (int i = 0; i < num_tests; i++) {
+        int threads = thread_counts[i];
+
+        vector_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
+
+        get_result_gpu(db, h_check, m);
+	    cudaDeviceSynchronize();
+
+        err = calc_diff(m, bb, h_check);
+        log_csv(mat_name, "CSR-VEC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+    };
 
     // ==========================================
     // Execute ELL SPMV
     // ==========================================
-//    fprintf(stdout, "Executing GPU ELL SpMV ... \n");
     unsigned int* dec; // row pointer on GPU
     double* dev; // col index on GPU
-    t0 = ReadTSC();
     allocate_ell_gpu(ell_col_ind, ell_vals, m, n_new, nnz, x, &dec, &dev, &dx,
                      &db);
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
@@ -315,7 +330,7 @@ int main(int argc, char** argv) {
         spmv_gpu_ell(dec, dev, m, n_new, nnz, dx, db, threads, &time_ms);
         // Verify and log
         get_result_gpu(db, h_check, m);
-	cudaDeviceSynchronize();
+	    cudaDeviceSynchronize();
 
         double err = calc_diff(m, h_check, bb);
         log_csv(mat_name, "ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
@@ -508,12 +523,13 @@ int main(int argc, char** argv) {
     free(csr_row_ptr);
     free(csr_col_ind);
     free(csr_vals);
-    free(b);
     free(bb);
     free(c);
     free(x);
     free(row_ind);
+    free(u_row_ind);
     free(col_ind);
+    free(u_col_ind);
     free(val);
 
     return 0;

@@ -29,9 +29,7 @@ mkdir -p results
 MATRICES=(
     "cant"
     "bcsstk" 
-    "e40r5000" 
-    "name131" 
-    "plsk1919"
+
 )
 
 echo $(pwd)

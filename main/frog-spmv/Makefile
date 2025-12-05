@@ -42,9 +42,9 @@ LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lm -fopenmp
 EXEC = $(BIN_DIR)/spmv
 
 # Note: We now look for .cc files for main
-C_SRC = util/common.c util/mmio.c
+C_SRC = util/common.c util/mmio.c 
 CC_SRC = main.cc csr5_conversion.cc
-CU_SRC = spmv.cu csr5_spmv.cu
+CU_SRC = spmv.cu csr5_spmv.cu coo_csr.cu
 
 # Generate object file names
 C_OBJS = $(addprefix $(OBJ_DIR)/,$(notdir $(C_SRC:.c=.o)))
