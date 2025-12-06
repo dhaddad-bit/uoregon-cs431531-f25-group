@@ -84,21 +84,22 @@ void make_tile_ptr(int rows, int omega, int sigma, int num_tiles,
     	int tile_idx = 0;
 	int tile_size = sigma * omega;
 
-	for (int i = 1; i <= num_tiles; i++){
-		int tile_nnz = (tile_size*i);
+	for (int tile = 1; tile <= num_tiles; tile++){
+		int tile_nnz = (tile_size*tile);
+		//cout<<tile_nnz<<" is tile nnz"<<endl;
 		
-		while ((row_idx < i) && 
-				(csr_row_ptr[row_idx] < tile_nnz)) 
-			row_idx++;
+		while ((row_idx < rows) && 
+				(csr_row_ptr[row_idx] < tile_nnz)){ 
+			row_idx++;}
 
-		(*tile_ptr)[i] = row_idx;
+		(*tile_ptr)[tile] = row_idx;
 	}
 	(*tile_ptr)[num_tiles] = rows;
 	
-	printf("Tile boundaries (row indices):\n");
+	/*printf("Tile boundaries (row indices):\n");
     	for (int i = 0; i <= 10; i++) {
         	printf("tile_ptr[%d] = %d\n", i, (*tile_ptr)[i]);
-    }	
+    }	*/
 }
 
 
