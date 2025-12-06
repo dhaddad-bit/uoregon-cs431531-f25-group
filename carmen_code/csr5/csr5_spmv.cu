@@ -99,21 +99,21 @@ __global__ void assign_csr5_col(int* og_col,
 }
 
 
-
+/*
 __global__ void gen_tile_ptr(int* tile_ptr,
 		int sigma, int omega, 
 		int* row_ptr){
 	int tile_col = blockIdx.x;
 	int tile_row = blockIdx.y;
 	int local_pos = threadIdx.x;
-	int global_tid = (tile_row * /*num_tiles + */ tile_col) * sigma + local_pos;
+	int global_tid = (tile_row * num_tiles +  tile_col) * sigma + local_pos;
 
 	int bnd = local_pos * sigma * omega;
 	//tile_ptr[local_pos] = binary_search(*row_ptr, bnd) -1;
 
 		
-
-}
+something to come back to 
+}*/
 
 
 void convert_csr_to_csr5_gpu(
@@ -129,7 +129,7 @@ void convert_csr_to_csr5_gpu(
     int** gpu_csr5_col_idx,
     int** gpu_csr5_row_ptr, 
     int** gpu_csr5_tile_ptr,
-    uint32_t** gpu_csr5_tile_desc
+    uint8_t** gpu_csr5_tile_desc
 ){	
 	size_t pitch_val, pitch_col;
 	//allocate memory for value blocks, 
@@ -184,16 +184,13 @@ void convert_csr_to_csr5_gpu(
 	cudaMemcpy(*gpu_csr5_row_ptr, og_row_ptr, (m+1)*sizeof(int), cudaMemcpyHostToDevice);
 	
 		//also mempry for the tile ptr
-	cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles)*sizeof(int));//maybe this should be unsigned int though
+	//cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles)*sizeof(int));//maybe this should be unsigned int though
+	
 	//GENERATE ROW POINTER
-	gen_tile_ptr<<<blocks, threads>>>(*gpu_csr5_tile_ptr,
+	/*gen_tile_ptr<<<blocks, threads>>>(*gpu_csr5_tile_ptr,
 		*sigma, *omega, 
 		*gpu_csr5_row_ptr
-	);
-	
-
-
-
+	);*/
 
 	
 

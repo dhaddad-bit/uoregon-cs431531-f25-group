@@ -2,6 +2,7 @@
 #define CSR5_H
 
 #include <stdint.h> // for uint32_t, uint64_t
+#include <cstdint>
 #include <cuda_runtime.h>
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---
 #ifdef __cplusplus
@@ -24,10 +25,11 @@ __global__ void assign_csr5_col(int* og_col,
                 int* csr5_col, size_t pitch_col,
                 int nnz, int num_tiles);
 
+/*
 __global__ void gen_tile_ptr(int* tile_ptr,
 		int sigma, int omega, 
 		int* row_ptr);
-
+*/
 
 // Host-side conversion function
 void convert_csr_to_csr5(

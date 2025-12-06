@@ -10,10 +10,10 @@
 #include <cuda_runtime.h>
 #include <cstdint>
 
+#include "csr5/csr5.h"
 #include "main.h"
 #include "spmv.h"
 #include "common.h"
-#include "csr5/csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
@@ -68,18 +68,81 @@ int find_sigma(int nnz, int rows){
 	return r; //incase something horrible happens ig
 }
 
-//just do it in cpu first geez
-void make_tile_desc(int rows, int omega, int sigma, unsigned int **csr_row_ptr, 
-		uint8_t **bit_flag_array, int **y_offset_array, 
-		int **seg_offset_array, int **empty_offset_array){
+void make_tile_ptr(int rows, int omega, int sigma, int num_tiles,
+		unsigned int *csr_row_ptr, int **tile_ptr)
+	{
+	*tile_ptr = (int*)malloc((num_tiles + 1) * sizeof(int));
 	
+	if (!*tile_ptr) {
+        	fprintf(stderr, "Memory allocation failed for tile_ptr\n");
+        	exit(1);
+    	}
+	
+	(*tile_ptr)[0] = 0;
 
-	for (int i = 0; i < (rows + 1); i++){
+    	int row_idx = 0;
+    	int tile_idx = 0;
+	int tile_size = sigma * omega;
+
+	for (int i = 1; i <= num_tiles; i++){
+		int tile_nnz = (tile_size*i);
 		
+		while ((row_idx < i) && 
+				(csr_row_ptr[row_idx] < tile_nnz)) 
+			row_idx++;
 
+		(*tile_ptr)[i] = row_idx;
+	}
+	(*tile_ptr)[num_tiles] = rows;
+	
+	printf("Tile boundaries (row indices):\n");
+    	for (int i = 0; i <= 10; i++) {
+        	printf("tile_ptr[%d] = %d\n", i, (*tile_ptr)[i]);
+    }	
+}
+
+
+//just do it in cpu first geez
+void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int *csr_row_ptr, 
+		//returns 
+		uint8_t **bit_flag_array, int **y_offset_array, 
+		int **seg_offset_array, int **empty_offset_array, int **tile_ptr){
+	fprintf(stdout, "in make tile destriptor");
+	//allocate memory for returns							calloc is
+	*bit_flag_array = (uint8_t*)calloc((num_tiles*omega*sigma), sizeof(uint8_t));//slower but assured 0's
+	*seg_offset_array = 	(int*)malloc(sizeof(int)*omega*num_tiles);
+	*y_offset_array =  	(int*)malloc(sizeof(int)*omega*num_tiles);
+	*empty_offset_array = 	(int*)malloc(sizeof(int)*omega*num_tiles);
+
+	if (!*bit_flag_array || !*seg_offset_array || !*y_offset_array || !*empty_offset_array) {
+		fprintf(stderr, "Memory allocation failed\n");
+		exit(1);
+	}
+	
+	uint8_t *temp_empty_rows = (uint8_t*)calloc(rows+1, sizeof(uint8_t));
+	for (int i = 0; i < (rows + 1); i++){
+		unsigned int row_idx = csr_row_ptr[i];
+		//fprintf(stdout, "row index is %u\n", row_idx);
+		if (csr_row_ptr[i] == csr_row_ptr[i+1]){
+			temp_empty_rows[i] = (uint8_t)1;
+		}
+		(*bit_flag_array)[row_idx] = (uint8_t)1;
+		
 	}
 
+	/*for (int i = 0; i < 10; i++){
+	       fprintf(stdout, " %02x,", (*bit_flag_array)[i]);
+	}*/
+	for (int i = 0; i < num_tiles; i++){
 
+	for (int j = 0; j < omega; j++){
+		int col_true_count;
+		for (int k = 0; k < sigma; k++){
+
+			
+		}
+		}
+	}	
 }
 
 
@@ -505,16 +568,21 @@ int main(int argc, char** argv) {
     int* y_off_array = NULL;
     int* seg_off_array = NULL;
     int* empty_array = NULL;
-    make_tile_desc(m, omega, sigma, &csr_row_ptr, 
+    int *cpu_tile_ptr = NULL;
+	
+    make_tile_ptr(m, omega, sigma, num_tiles_p, csr_row_ptr, &cpu_tile_ptr);    
+
+    make_tile_desc(m, omega, sigma, num_tiles_p, csr_row_ptr, 
 		  &bit_flag_array, &y_off_array, 
-		  &seg_off_array, &empty_array);
+		  &seg_off_array, &empty_array, &cpu_tile_ptr);
 
     //host wowow
     t0 = ReadTSC();
     convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
 		        &sigma, &omega,  
-                        &num_tiles_p, &gpu_csr5_vals, &h_csr5_col_idx, 
+                        &num_tiles_p, &gpu_csr5_vals, &gpu_csr5_col_idx, 
                         &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_bit_flag);
+
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation
@@ -523,7 +591,6 @@ int main(int argc, char** argv) {
     int* d2_csr5_row_idx = NULL;
     int* d2_csr5_tile_ptr = NULL;
     unsigned int* d2_csr5_tile_desc = NULL;
-    // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
     int csr5_capacity2 = csr5_num_tiles * 32 * 16;
     // Values
 
