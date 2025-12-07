@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --account=sgreenvoss    ### Account to charge
+#SBATCH --job-name=spmv_gpu     ### Job Name
+#SBATCH --output=results/logs/spmv_%j.out    ### File in which to store job output
+#SBATCH --error=results/logs/spmv_%j.err     ### File in which to store job error messages
+#SBATCH --partition=short         ### Quality of Service
+#SBATCH --time=00:20:00         ### Increased time limit (Profiling is slow!)
+#SBATCH --nodes=1               ### Node count
+#SBATCH --ntasks-per-node=1     ### Tasks per node
+#SBATCH --gres=gpu:1            ### Number of GPUs
+#SBATCH --cpus-per-task=28      ### Number of threads
+
+MATRIX_DIR="matrices/"
+OUTPUT_DIR="results/"
+EXEC_DIR="bin"
+
+module load gcc
+module load cuda
+
+export OMP_PROC_BIND=true
+export OMP_NUM_THREADS=28
+
+ncu \
+  -o profile_report \
+  -f \
+  --set full \
+  --target-processes all \
+  $EXEC_DIR/spmv "$MATRIX_DIR"/cant/cant.mtx "$MATRIX_DIR"/cant/b.mtx res_vecs/ans.mtx

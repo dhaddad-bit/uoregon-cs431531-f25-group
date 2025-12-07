@@ -1,0 +1,13 @@
+ls: cannot access 'matrices//atmosmodm/b*': No such file or directory
+Error processing Matrix Market banner.
+CUDA error at src/spmv.cu:208 code=700(an illegal memory access was encountered) "cudaEventRecord(stop, 0)" 
+CUDA error at src/spmv.cu:208 code=700(an illegal memory access was encountered) "cudaEventRecord(stop, 0)" 
+CUDA error at src/spmv.cu:208 code=700(an illegal memory access was encountered) "cudaEventRecord(stop, 0)" 
+ls: cannot access 'matrices//lns_131/b*': No such file or directory
+Error processing Matrix Market banner.
+CUDA error at src/spmv.cu:176 code=700(an illegal memory access was encountered) "cudaEventRecord(stop, 0)" 
+CUDA error at src/spmv.cu:176 code=717(operation not supported on global/shared address space) "cudaEventRecord(stop, 0)" 
+ls: cannot access 'matrices//stokes/b*': No such file or directory
+Error processing Matrix Market banner.
+ls: cannot access 'matrices//tx2010/b*': No such file or directory
+Error processing Matrix Market banner.

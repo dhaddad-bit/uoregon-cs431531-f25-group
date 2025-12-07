@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --account=sgreenvoss
 #SBATCH --job-name=spmv_gpu   ### Job Name
-#SBATCH --output=spmv_%j.out  ### File in which to store job output
-#SBATCH --error=spmv_%j.err   ### File in which to store job error messages
+#SBATCH --output=results/logs/spmv_%j.out  ### File in which to store job output
+#SBATCH --error=results/logs/err/spmv_%j.err   ### File in which to store job error messages
 #SBATCH --partition=short       ### Quality of Service (like a queue in PBS)
 #SBATCH --time=00:30:00     ### Wall clock time limit in Days-HH:MM:SS
 #SBATCH --nodes=1             ### Node count required for the job
@@ -12,6 +12,7 @@
 
 MATRIX_DIR="matrices/"
 OUTPUT_DIR="test_out/"
+EXEC_DIR="bin"
 
 module load gcc
 module load cuda
@@ -19,8 +20,6 @@ module load cuda
 
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=28
-
-nvidia-smi -L
 
 # set up to take avg over 100 for all 
 #ncu \
@@ -36,6 +35,6 @@ for item in "$MATRIX_DIR"/*; do
 		vector_base=$(basename "$vector")
 		matrix=$(ls "$item" --ignore="$vector_base" --ignore="ans*" | head -n 1)
 		matrix="$item/$matrix"
-		./spmv "$matrix" "$vector" test_out/ans.mtx
+		$EXEC_DIR/spmv "$matrix" "$vector" results/res_vecs/ans.mtx
 	fi
 done

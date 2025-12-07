@@ -10,6 +10,7 @@
 // I'm doing my best to understand each line of code and why/where it is needed.
 
 #include <cuda_runtime.h>
+#include "spmv.h"
 #include <iostream>
 #include <cassert>
 
@@ -21,17 +22,17 @@ float launch_and_time_sell_c(
     int SLICE_THICKNESS,
     const unsigned int* h_sell_slice_ptr,
     const unsigned int* h_sell_col_ind,
-    const double* h_sell_vals,
-    const double* h_x;
-    const double* h_y; 
+    const P_TYPE* h_sell_vals,
+    const P_TYPE* h_x;
+    const P_TYPE* h_y; 
     )
 {
     // --- 1. Device pointers ---
     unsigned int* d_sell_slice_ptr;
     unsigned int* d_sell_col_ind;
-    double* d_sell_vals;
-    double* d_x;
-    double* d_y;
+    P_TYPE* d_sell_vals;
+    P_TYPE* d_x;
+    P_TYPE* d_y;
 
     // --- 2. CUDA Events for Timing events ---
     cudaEvent_t start, stop;
@@ -41,16 +42,16 @@ float launch_and_time_sell_c(
     // --- 3. Allocate memory on device AKA GPU --- 
     gpuErrchk( cudaMalloc(&d_sell_slice_ptr, (num_slices+1)*sizeof(unsigned int)) );
     gpuErrchk( cudaMalloc(&d_sell_col_ind, total_nnz*sizeof(unsigned int)) );
-    gpuErrchk( cudaMalloc(&d_sell_vals, total_nnz*sizeof(double)) );
-    gpuErrchk( cudaMalloc(&d_x, n*sizeof(double)) );
-    gpuErrchk( cudaMalloc(&d_y, m_padded*sizeof(double)) );
+    gpuErrchk( cudaMalloc(&d_sell_vals, total_nnz*sizeof(P_TYPE)) );
+    gpuErrchk( cudaMalloc(&d_x, n*sizeof(P_TYPE)) );
+    gpuErrchk( cudaMalloc(&d_y, m_padded*sizeof(P_TYPE)) );
 
     // --- 4. Host device memory copy ---
     gpuErrchk( cudaMemcpy(d_sell_slice_ptr, h_sell_slice_ptr, (num_slices + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice) );
     gpuErrchk( cudaMemcpy(d_sell_col_ind, h_sell_col_ind, total_nnz * sizeof(unsigned int), cudaMemcpyHostToDevice) );
-    gpuErrchk( cudaMemcpy(d_sell_vals, h_sell_vals, total_nnz * sizeof(double), cudaMemcpyHostToDevice) );
-    gpuErrchk( cudaMemcpy(d_x, h_x, n * sizeof(double), cudaMemcpyHostToDevice) );
-    gpuErrchk( cudaMemcpy(d_y, h_y, m_padded * sizeof(double), cudaMemcpyHostToDevice) );
+    gpuErrchk( cudaMemcpy(d_sell_vals, h_sell_vals, total_nnz * sizeof(P_TYPE), cudaMemcpyHostToDevice) );
+    gpuErrchk( cudaMemcpy(d_x, h_x, n * sizeof(P_TYPE), cudaMemcpyHostToDevice) );
+    gpuErrchk( cudaMemcpy(d_y, h_y, m_padded * sizeof(P_TYPE), cudaMemcpyHostToDevice) );
 
     // --- 5. Set Up kernel launch parameters ---
     int THREADS_PER_BLOCK = 256;
@@ -75,7 +76,7 @@ float launch_and_time_sell_c(
     gpuErrchk( cudaEventElapsedTime(&milliseconds, start, stop) );
 
     // --- 8. Copy Result Vector back to host from device ---
-    gpuErrchk( cudaMemcpy(h_y, d_y, m_padded * sizeof(double), cudaMemcpyDeviceToHost) );
+    gpuErrchk( cudaMemcpy(h_y, d_y, m_padded * sizeof(P_TYPE), cudaMemcpyDeviceToHost) );
 
     // --- 9. Cleanup: free in opposite order of allocation (inside first for data structures) --- 
     gpuErrchk( cudaFree(d_y) );
