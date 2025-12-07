@@ -27,14 +27,14 @@ inline void check_cuda(cudaError_t result, const char* const func, const char* c
 template <class T>
 __global__ void
 spmv_kernel(unsigned int* row_ptr, unsigned int* col_ind, T* vals, 
-            int m, int n, int nnz, double* x, double* b) {
+            int m, int n, int nnz, P_TYPE* x, P_TYPE* b) {
     // COMPLETE THIS FUNCTION
-    extern __shared__ double data[];
+    extern __shared__ P_TYPE data[];
     unsigned int row = blockIdx.x;  // new: BLOCK = ROW we are processing
     unsigned int tid = threadIdx.x; // Thread ID inside the block (0 to 63)! Remember this indexing!
 
     // --- partial sum for this thread --- 
-    double partial_sum = 0.0;
+    P_TYPE partial_sum = 0.0;
     unsigned int row_start = row_ptr[row];
     unsigned int row_end = row_ptr[row + 1];
     // blocks traverse/coellese data in the row differently 
@@ -58,11 +58,11 @@ spmv_kernel(unsigned int* row_ptr, unsigned int* col_ind, T* vals,
 // --- ELL SPMV KERNEL ---
 template <class T>
 __global__ void
-spmv_kernel_ell(unsigned int* col_ind, T* vals, int m, int n, int nnz, double* x, double* b) {
-    extern __shared__ double data[];
+spmv_kernel_ell(unsigned int* col_ind, T* vals, int m, int n, int nnz, P_TYPE* x, P_TYPE* b) {
+    extern __shared__ P_TYPE data[];
     unsigned int row = blockIdx.x; // new: BLOCK = ROW we are processing
     unsigned int tid = threadIdx.x; // Thread ID inside the block (0 to 63)! Remember this indexing!
-    double partial_sum = 0.0;
+    P_TYPE partial_sum = 0.0;
     
     // --- calculate row indexes in ELL format --- 
     unsigned int row_start = row * n;
@@ -98,9 +98,9 @@ spmv_sell_c_kernel(
     int SLICE_THICKNESS,
     const unsigned int* slice_ptr,
     const unsigned int* col_ind,
-    const double* vals,
-    const double* x,
-    double* y) {
+    const P_TYPE* vals,
+    const P_TYPE* x,
+    P_TYPE* y) {
     // 1. Identify the slice we are handling
     int slice_id = blockIdx.x;
     if (slice_id >= num_slices) return; // Boundary check
@@ -114,7 +114,7 @@ spmv_sell_c_kernel(
     unsigned int next_start = slice_ptr[slice_id + 1];
     unsigned int slice_len = (next_start - start) / SLICE_THICKNESS;
 
-    double sum = 0.0;
+    P_TYPE sum = 0.0;
 
     // 4. Iterate over columns in slice (j = depth into slice)
     for (int j = 0; j < slice_len; j++) {
@@ -124,7 +124,7 @@ spmv_sell_c_kernel(
         unsigned int col = col_ind[idx];
         if (col != (unsigned int)(-1)) {
             // Valid entry
-            double val = vals[idx];
+            P_TYPE val = vals[idx];
             sum += val * x[col];
         }
     }
@@ -137,18 +137,18 @@ spmv_sell_c_kernel(
 // --- WRAPPERS (Silenced Printfs and Return Times) 
 // =============================================
 // --- SPMV WRAPPER ---
-void spmv_gpu(unsigned int* row_ptr, unsigned int* col_ind, double* vals,
-              int m, int n, int nnz, double* x, double* b, unsigned int threads, float* time_ms) {
+void spmv_gpu(unsigned int* row_ptr, unsigned int* col_ind, P_TYPE* vals,
+              int m, int n, int nnz, P_TYPE* x, P_TYPE* b, unsigned int threads, float* time_ms) {
     // timers
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start)); checkCudaErrors(cudaEventCreate(&stop));
     dim3 dimGrid(m, 1, 1); dim3 dimBlock(threads, 1, 1); // Explanation: We are launching 'blocks' blocks, each with 'threads' threads
-    unsigned int shared = threads * sizeof(double);
+    unsigned int shared = threads * sizeof(P_TYPE);
 
     checkCudaErrors(cudaEventRecord(start, 0));
     for(unsigned int i = 0; i < MAX_ITER; i++) {
         cudaDeviceSynchronize();
-        spmv_kernel<double><<<dimGrid, dimBlock, shared>>>(row_ptr, col_ind, vals, m, n, nnz, x, b);
+        spmv_kernel<P_TYPE><<<dimGrid, dimBlock, shared>>>(row_ptr, col_ind, vals, m, n, nnz, x, b);
     }
     checkCudaErrors(cudaEventRecord(stop, 0));
     checkCudaErrors(cudaEventSynchronize(stop));
@@ -160,18 +160,18 @@ void spmv_gpu(unsigned int* row_ptr, unsigned int* col_ind, double* vals,
 
 }
 // --- ELL SPMV WRAPPER ---
-void spmv_gpu_ell(unsigned int* col_ind, double* vals, int m, int n, int nnz, 
-                  double* x, double* b, unsigned int threads, float* time_ms){
+void spmv_gpu_ell(unsigned int* col_ind, P_TYPE* vals, int m, int n, int nnz, 
+                  P_TYPE* x, P_TYPE* b, unsigned int threads, float* time_ms){
     // timers
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start)); checkCudaErrors(cudaEventCreate(&stop));
     dim3 dimGrid(m, 1, 1); dim3 dimBlock(threads, 1, 1);
-    unsigned int shared = threads * sizeof(double);
+    unsigned int shared = threads * sizeof(P_TYPE);
 
     checkCudaErrors(cudaEventRecord(start, 0));
     for(unsigned int i = 0; i < MAX_ITER; i++) {
         cudaDeviceSynchronize();
-        spmv_kernel_ell<double><<<dimGrid, dimBlock, shared>>>(col_ind, vals, m, n, nnz, x, b);
+        spmv_kernel_ell<P_TYPE><<<dimGrid, dimBlock, shared>>>(col_ind, vals, m, n, nnz, x, b);
     }
     checkCudaErrors(cudaEventRecord(stop, 0));
     checkCudaErrors(cudaEventSynchronize(stop));
@@ -188,9 +188,9 @@ extern "C" void spmv_gpu_sellc(
     int SLICE_THICKNESS,
     unsigned int* d_slice_ptr,
     unsigned int* d_col_ind,
-    double* d_vals,
-    double* d_x,
-    double* d_y,
+    P_TYPE* d_vals,
+    P_TYPE* d_x,
+    P_TYPE* d_y,
     float* time_ms ) {
     // timers
     cudaEvent_t start; cudaEvent_t stop;
@@ -219,20 +219,20 @@ extern "C" void spmv_gpu_sellc(
 // --- Helper Functions (Silenced Printfs)
 // =============================================
 // --- Allocate CSR Data on GPU --- 
-// void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind, double* vals, int m, int n, int nnz, double* x, 
+// void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind, P_TYPE* vals, int m, int n, int nnz, P_TYPE* x, 
 //                       unsigned int** dev_row_ptr, unsigned int** dev_col_ind, 
-//                       double** dev_vals, double** dev_x, double** dev_b) {
+//                       P_TYPE** dev_vals, P_TYPE** dev_x, P_TYPE** dev_b) {
 //     // Use 'CopyData' to allocate memory for CSR arrays on device (GPU)
 //     CopyData(row_ptr, m + 1, sizeof(unsigned int), dev_row_ptr);
 //     CopyData(col_ind, nnz, sizeof(unsigned int), dev_col_ind);
-//     CopyData(vals, nnz, sizeof(double), dev_vals);
-//     CopyData(x, n, sizeof(double), dev_x);
-//     checkCudaErrors(cudaMalloc((void**)dev_b, m * sizeof(double))); // Allocate space for result vector b on device
+//     CopyData(vals, nnz, sizeof(P_TYPE), dev_vals);
+//     CopyData(x, n, sizeof(P_TYPE), dev_x);
+//     checkCudaErrors(cudaMalloc((void**)dev_b, m * sizeof(P_TYPE))); // Allocate space for result vector b on device
 // }
 // --- Get Result from GPU --- 
-// void get_result_gpu(double* dev_b, double* b, int m) {
+// void get_result_gpu(P_TYPE* dev_b, P_TYPE* b, int m) {
 //     // Copy result vector b from device to host
-//     checkCudaErrors(cudaMemcpy(b, dev_b, m * sizeof(double), cudaMemcpyDeviceToHost));
+//     checkCudaErrors(cudaMemcpy(b, dev_b, m * sizeof(P_TYPE), cudaMemcpyDeviceToHost));
 // }
 
 // --- Copy Data To GPU --- 
@@ -248,12 +248,12 @@ void CopyData(T* input, unsigned int N, unsigned int dsize, T** d_in) {
 }
 
 // --- Allocate ELL Data on GPU --- 
-void allocate_ell_gpu(unsigned int* col_ind, double* vals, int m, int n, 
-                      int nnz, double* x, unsigned int** dev_col_ind, 
-                      double** dev_vals, double** dev_x, double** dev_b) {
+void allocate_ell_gpu(unsigned int* col_ind, P_TYPE* vals, int m, int n, 
+                      int nnz, P_TYPE* x, unsigned int** dev_col_ind, 
+                      P_TYPE** dev_vals, P_TYPE** dev_x, P_TYPE** dev_b) {
     int padded_nnz = m*n;
     // Use 'CopyData' to allocate memory for ELL arrays on device (GPU)
     CopyData(col_ind, padded_nnz, sizeof(unsigned int), dev_col_ind);
-    CopyData(vals, padded_nnz, sizeof(double), dev_vals);
+    CopyData(vals, padded_nnz, sizeof(P_TYPE), dev_vals);
 }
 

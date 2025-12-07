@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "spmv.h"
 #include "common.h"
 
-static double g_ticks_persecond = 0.0;
+static P_TYPE g_ticks_persecond = 0.0;
 
 void InitTSC(void)
 {
@@ -11,12 +12,12 @@ void InitTSC(void)
     sleep(1);
     uint64_t end_tick = ReadTSC();
 
-    g_ticks_persecond = (double) (end_tick - start_tick);
+    g_ticks_persecond = (P_TYPE) (end_tick - start_tick);
     //fprintf(stderr, "%e ticks per second.\n", g_ticks_persecond);
 }
 
 
-double ElapsedTime(uint64_t ticks)
+P_TYPE ElapsedTime(uint64_t ticks)
 {
     if (g_ticks_persecond == 0.0) {
         fprintf(stderr, "TSC timer has not been initialized.\n");

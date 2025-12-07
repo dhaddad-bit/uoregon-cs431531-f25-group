@@ -36,9 +36,9 @@ extern "C" void convert_csr_to_csr5(
     int m, int n, int nnz,
     const unsigned int* h_row_ptr,
     const unsigned int* h_col_idx,
-    const double* h_val,
+    const P_TYPE* h_val,
     int* num_tiles,
-    double** h_csr5_val,
+    P_TYPE** h_csr5_val,
     int** h_csr5_col_idx,
     int** h_csr5_row_idx, // Row Versioning
     int** h_csr5_tile_ptr,
@@ -52,7 +52,7 @@ extern "C" void convert_csr_to_csr5(
     
     // --- STEP 2: Allocate output arrays --- 
     int capacity = (*num_tiles *(OMEGA * SIGMA));
-    double *csr5_val = (double*) calloc (capacity, sizeof(double)); 
+    P_TYPE *csr5_val = (P_TYPE*) calloc (capacity, sizeof(P_TYPE)); 
     int* csr5_col_idx =(int*) calloc (capacity, sizeof(int));
     int* csr5_row_idx =(int*) calloc (capacity, sizeof(int));
     int* tile_ptr = (int*) malloc((num_tiles_local +1) * sizeof(int));

@@ -1,6 +1,6 @@
 #ifndef CSR5_H
 #define CSR5_H
-
+#include "common.h"
 #include <stdint.h> // for uint32_t, uint64_t
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---
 #ifdef __cplusplus
@@ -15,10 +15,10 @@ void convert_csr_to_csr5(
     int m, int n, int nnz,
     const unsigned int* h_row_ptr,
     const unsigned int* h_col_idx,
-    const double* h_val,
+    const P_TYPE* h_val,
     // Outputs
     int* num_tiles,
-    double** h_csr5_val,
+    P_TYPE** h_csr5_val,
     int** h_csr5_col_idx,
     int** h_csr5_row_idx, // Row versioning of CSR5 to test what's wrong with my computation logic,, i rushed it at 2am and it doesn't work
     int** h_csr5_tile_ptr,
@@ -29,13 +29,13 @@ void convert_csr_to_csr5(
 void spmv_gpu_csr5(
     int m,
     int num_tiles,
-    double* d_val,
+    P_TYPE* d_val,
     int* d_col_idx,
     int* d_row_idx, // Row versioning of CSR5
     int* d_tile_ptr,
     uint32_t* d_tile_desc,
-    double* d_x,
-    double* d_y,
+    P_TYPE* d_x,
+    P_TYPE* d_y,
     float* time_ms
 );
 
