@@ -108,19 +108,26 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 		//returns 
 		uint8_t **bit_flag_array, int **y_offset_array, 
 		int **seg_offset_array, int **empty_offset_array, int **tile_ptr){
-	fprintf(stdout, "in make tile destriptor");
+	fprintf(stdout, "in make tile destriptor\n");
 	//allocate memory for returns							calloc is
 	*bit_flag_array = (uint8_t*)calloc((num_tiles*omega*sigma), sizeof(uint8_t));//slower but assured 0's
-	*seg_offset_array = 	(int*)malloc(sizeof(int)*omega*num_tiles);
-	*y_offset_array =  	(int*)malloc(sizeof(int)*omega*num_tiles);
-	*empty_offset_array = 	(int*)malloc(sizeof(int)*omega*num_tiles);
+	*seg_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
+	*y_offset_array =  	(int*)calloc(omega*num_tiles, sizeof(int));
+	//*empty_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
 
-	if (!*bit_flag_array || !*seg_offset_array || !*y_offset_array || !*empty_offset_array) {
-		fprintf(stderr, "Memory allocation failed\n");
+	if (!*bit_flag_array || !*seg_offset_array || !*y_offset_array) {
+		fprintf(stderr, "descriptor memory allocation failed\n");
 		exit(1);
 	}
 	
 	uint8_t *temp_empty_rows = (uint8_t*)calloc(rows+1, sizeof(uint8_t));
+
+	if (!bit_flag_array) {
+		fprintf(stderr, "temp memory allocation failed\n");
+		exit(1);
+	}
+
+
 	for (int i = 0; i < (rows + 1); i++){
 		unsigned int row_idx = csr_row_ptr[i];
 		//fprintf(stdout, "row index is %u\n", row_idx);
@@ -131,19 +138,59 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 		
 	}
 
-	/*for (int i = 0; i < 10; i++){
+	/*for (int i = 0; i < rows; i++){
+	       fprintf(stdout, " %02x,", temp_empty_rows[i]);
+	}
+	for (int i = 0; i < 10; i++){
 	       fprintf(stdout, " %02x,", (*bit_flag_array)[i]);
 	}*/
 	for (int i = 0; i < num_tiles; i++){
+		int offset = 0;
+		for (int j = 0; j < omega; j++){
+			int true_count = 0;
+			for (int k = 0; k < sigma; k++){
+				if ((*bit_flag_array)[j*sigma + k] == (uint8_t)1){
+					true_count++;
+				}
+			}
+		if (true_count == 0){
+			offset++;
+		}
+		else{
+			(*y_offset_array)[i*omega + j] = true_count;
 
-	for (int j = 0; j < omega; j++){
-		int col_true_count;
-		for (int k = 0; k < sigma; k++){
-
-			
+			if (offset != 0 && ((i*sigma+ j) - offset) > 0 ){
+				(*seg_offset_array)[((i*sigma+ j)) - offset] = offset;
+				offset = 0;
+			}
 		}
 		}
-	}	
+	}
+	/*fprintf(stdout, "y offset first 1000\n");
+	for (int i = 0; i < 1000; i++){
+	       fprintf(stdout, " %d,", (*y_offset_array)[i]);
+	}
+
+	fprintf(stdout, "\nseg offset first 1000\n");
+	for (int i = 0; i < 1000; i++){
+	       fprintf(stdout, " %d,", (*seg_offset_array)[i]);
+	}*/
+
+	//EMPTY OFFSET
+	//*empty_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
+	
+	for (int i = 0; i < num_tiles - 1; i++){
+		int lower_range = (*tile_ptr)[i];
+		int upper_range = (*tile_ptr)[i+1];
+
+		for (int row = lower_range; row < upper_range; row++) {
+
+		if (temp_empty_rows[row]) {
+		    //tile_empty_mask[i] = 1;
+		    break;
+		}
+		}
+	}
 }
 
 
