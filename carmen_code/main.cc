@@ -107,7 +107,7 @@ void make_tile_ptr(int rows, int omega, int sigma, int num_tiles,
 void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int *csr_row_ptr, 
 		//returns 
 		uint8_t **bit_flag_array, int **y_offset_array, 
-		int **seg_offset_array, int **empty_offset_array, int **tile_ptr){
+		int **seg_offset_array, int ***empty_idx_array, int **tile_ptr){
 	fprintf(stdout, "in make tile destriptor\n");
 	//allocate memory for returns							calloc is
 	*bit_flag_array = (uint8_t*)calloc((num_tiles*omega*sigma), sizeof(uint8_t));//slower but assured 0's
@@ -140,10 +140,12 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 
 	/*for (int i = 0; i < rows; i++){
 	       fprintf(stdout, " %02x,", temp_empty_rows[i]);
-	}
-	for (int i = 0; i < 10; i++){
+	}*/
+	/*for (int i = 0; i < 10; i++){
 	       fprintf(stdout, " %02x,", (*bit_flag_array)[i]);
 	}*/
+	
+	//FOR SEG OFFSET for Y OFFSET
 	for (int i = 0; i < num_tiles; i++){
 		int offset = 0;
 		for (int j = 0; j < omega; j++){
@@ -166,30 +168,112 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 		}
 		}
 	}
-	/*fprintf(stdout, "y offset first 1000\n");
-	for (int i = 0; i < 1000; i++){
-	       fprintf(stdout, " %d,", (*y_offset_array)[i]);
-	}
 
-	fprintf(stdout, "\nseg offset first 1000\n");
-	for (int i = 0; i < 1000; i++){
-	       fprintf(stdout, " %d,", (*seg_offset_array)[i]);
-	}*/
-
-	//EMPTY OFFSET
+	//EMPTY OFFSET (getting size of array)
 	//*empty_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
-	
+	int empty_row_tiles = 0;
+
 	for (int i = 0; i < num_tiles - 1; i++){
 		int lower_range = (*tile_ptr)[i];
 		int upper_range = (*tile_ptr)[i+1];
 
 		for (int row = lower_range; row < upper_range; row++) {
 
-		if (temp_empty_rows[row]) {
-		    //tile_empty_mask[i] = 1;
-		    break;
+			if (temp_empty_rows[row]) {
+			    int value = (*tile_ptr)[i];
+			    (*tile_ptr)[i] = -value;
+			    empty_row_tiles++;
+			    //if (value == 0)
+			    //	{(*tile_ptr)[i] = -1;}//I couldnt figure out how to do -0
+			    break;
+			}
 		}
+	}
+	//fprintf(stdout, "number of empty row tiles is %d\n", empty_row_tiles);
+	*empty_idx_array = (int**)malloc((empty_row_tiles+1) * sizeof(int*));//+1 for zero too
+	int empty_idx = 1;
+	if (!**empty_idx_array) {
+		fprintf(stderr, "empty index array  memory allocation failed\n");
+		exit(1);
+	}
+	//EMPTY OFFSET (assigning array elements)
+	for (int tile = 0; tile < num_tiles; tile++){
+		if ((*tile_ptr)[tile] < 0){
+			
+
+			int start = std::abs((*tile_ptr)[tile]);
+			//int temp_array[1000];
+			int end = std::abs((*tile_ptr)[tile + 1]);
+
+			//pass one for size
+			int count = 0;
+			for (int i = start; i < end; i++) {
+			    if (temp_empty_rows[i]) {
+				count++;
+			    }
+			}
+
+			if (count > 0){
+				(*empty_idx_array)[empty_idx] = (int*)malloc(count * sizeof(int));
+				int idx = 0;
+			//second pass to get empty array
+			for (int i = start; i < end; i++){
+				if (temp_empty_rows[i]){	
+				
+					(*empty_idx_array)[empty_idx][idx] = i;
+					idx++;
+					}
+				}
+		printf("DEBUG: Tile %d -> stored %d empty rows (first: %d, last: %d)\n",
+	       tile, count,
+	       (*empty_idx_array)[empty_idx][0],
+	       (*empty_idx_array)[empty_idx][count-1]);//*/
+			empty_idx++;
+			}
+			
+		
 		}
+	}
+	//end of loop
+	//free(temp_empty_rows);
+	/*fprintf(stdout, "empty tile\n");
+	for (int i = 0; i < empty_idx; i++){
+		int count = 0;
+		while ((*empty_idx_array)[i][count] != NULL){
+		fprintf(stdout, " %d,", (*empty_idx_array)[i][count]);
+		count++;
+				}
+	}*/
+
+
+	//EMPTY ARRAY FOR all ZERO TILEs
+	int start = std::abs((*tile_ptr)[0]);
+	//int temp_array[1000];
+	int end = std::abs((*tile_ptr)[1]);
+
+	//pass one for size
+	int zcount = 0;
+	for (int i = start; i < end; i++) {
+	    if (temp_empty_rows[i]) {
+		zcount++;
+	    }
+	}
+
+	if (zcount > 0){
+		(*empty_idx_array)[0] = (int*)malloc(zcount * sizeof(int));
+		int idx = 0;
+	//second pass to get empty array
+	for (int i = start; i < end; i++){
+		if (temp_empty_rows[i]){
+
+			(*empty_idx_array)[0][idx] = i;
+			idx++;
+			}
+		}
+		printf("DEBUG: Tile 0 -> stored %d empty rows (first: %d, last: %d)\n",
+	       zcount,
+	       (*empty_idx_array)[0][0],
+	       (*empty_idx_array)[0][zcount-1]);
 	}
 }
 
@@ -615,7 +699,7 @@ int main(int argc, char** argv) {
     uint8_t* bit_flag_array = NULL;
     int* y_off_array = NULL;
     int* seg_off_array = NULL;
-    int* empty_array = NULL;
+    int** empty_array = NULL;
     int *cpu_tile_ptr = NULL;
 	
     make_tile_ptr(m, omega, sigma, num_tiles_p, csr_row_ptr, &cpu_tile_ptr);    
