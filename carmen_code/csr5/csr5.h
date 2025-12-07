@@ -70,11 +70,17 @@ void convert_csr_to_csr5_gpu(
     int *omega, int *sigma,
     // Outputs
     int* num_tiles,
-    double** h_csr5_val,
-    int** h_csr5_col_idx,
-    int** h_csr5_row_idx, 
-    int** h_csr5_tile_ptr,
-    uint8_t** h_csr5_tile_desc
+    double** gpu_csr5_val,
+    int** gpu_csr5_col_idx,
+    int** gpu_csr5_row_idx, 
+    int** gpu_csr5_tile_ptr,
+    uint8_t** gpu_csr5_bit_array,
+    //additional 
+    uint8_t** cpu_csr5_bit_array,
+    int **seg_array, int ***empty_array,
+    int **y_array, int **gpu_y_array, 
+    int **gpu_seg_array, int*** gpu_empty_array
+
 );
 
 

@@ -108,7 +108,7 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 		//returns 
 		uint8_t **bit_flag_array, int **y_offset_array, 
 		int **seg_offset_array, int ***empty_idx_array, int **tile_ptr){
-	fprintf(stdout, "in make tile destriptor\n");
+	//fprintf(stdout, "in make tile destriptor\n");
 	//allocate memory for returns							calloc is
 	*bit_flag_array = (uint8_t*)calloc((num_tiles*omega*sigma), sizeof(uint8_t));//slower but assured 0's
 	*seg_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
@@ -224,10 +224,10 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 					idx++;
 					}
 				}
-		printf("DEBUG: Tile %d -> stored %d empty rows (first: %d, last: %d)\n",
+	/*	printf("DEBUG: Tile %d -> stored %d empty rows (first: %d, last: %d)\n",
 	       tile, count,
 	       (*empty_idx_array)[empty_idx][0],
-	       (*empty_idx_array)[empty_idx][count-1]);//*/
+	       (*empty_idx_array)[empty_idx][count-1]);*/
 			empty_idx++;
 			}
 			
@@ -270,10 +270,10 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 			idx++;
 			}
 		}
-		printf("DEBUG: Tile 0 -> stored %d empty rows (first: %d, last: %d)\n",
+/*		printf("DEBUG: Tile 0 -> stored %d empty rows (first: %d, last: %d)\n",
 	       zcount,
 	       (*empty_idx_array)[0][0],
-	       (*empty_idx_array)[0][zcount-1]);
+	       (*empty_idx_array)[0][zcount-1]);*/
 	}
 }
 
@@ -689,7 +689,6 @@ int main(int argc, char** argv) {
     int* gpu_csr5_col_idx = NULL;
     int* gpu_csr5_row_idx = NULL;
     int* gpu_csr5_tile_ptr = NULL;
-    uint8_t* gpu_csr5_bit_flag = NULL;
 	
     int sigma = find_sigma(nnz, m);
 	//fprintf(stdout, "sigma is %d\n", sigma);     
@@ -708,12 +707,20 @@ int main(int argc, char** argv) {
 		  &bit_flag_array, &y_off_array, 
 		  &seg_off_array, &empty_array, &cpu_tile_ptr);
 
+    uint8_t* gpu_csr5_bit_flag = NULL;
+    int* gpu_y_off_array = NULL;
+    int* gpu_seg_off_array = NULL;
+    int** gpu_empty_array = NULL;
     //host wowow
     t0 = ReadTSC();
     convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
-		        &sigma, &omega,  
-                        &num_tiles_p, &gpu_csr5_vals, &gpu_csr5_col_idx, 
-                        &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_bit_flag);
+		        &sigma, 	&omega,  
+                        &num_tiles_p, 		&gpu_csr5_vals, 	&gpu_csr5_col_idx, 
+                        &gpu_csr5_row_idx, 	&gpu_csr5_tile_ptr, 	&gpu_csr5_bit_flag,
+			//additional cpu/gpu things from tile desc
+			&bit_flag_array, 	&seg_off_array, 	&empty_array,
+		    	&y_off_array, 		&gpu_y_off_array,	&gpu_seg_off_array,
+			&gpu_empty_array);
 
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
