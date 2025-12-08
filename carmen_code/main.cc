@@ -10,10 +10,10 @@
 #include <cuda_runtime.h>
 #include <cstdint>
 
+#include "csr5/csr5.h"
 #include "main.h"
 #include "spmv.h"
 #include "common.h"
-#include "csr5/csr5.h"
 
 #define MAX_FILENAME 256
 #define MAX_NUM_LENGTH 100
@@ -68,18 +68,213 @@ int find_sigma(int nnz, int rows){
 	return r; //incase something horrible happens ig
 }
 
-//just do it in cpu first geez
-void make_tile_desc(int rows, int omega, int sigma, unsigned int **csr_row_ptr, 
-		uint8_t **bit_flag_array, int **y_offset_array, 
-		int **seg_offset_array, int **empty_offset_array){
+void make_tile_ptr(int rows, int omega, int sigma, int num_tiles,
+		unsigned int *csr_row_ptr, int **tile_ptr)
+	{
+	*tile_ptr = (int*)malloc((num_tiles + 1) * sizeof(int));
 	
+	if (!*tile_ptr) {
+        	fprintf(stderr, "Memory allocation failed for tile_ptr\n");
+        	exit(1);
+    	}
+	
+	(*tile_ptr)[0] = 0;
 
-	for (int i = 0; i < (rows + 1); i++){
+    	int row_idx = 0;
+    	int tile_idx = 0;
+	int tile_size = sigma * omega;
+
+	for (int tile = 1; tile <= num_tiles; tile++){
+		int tile_nnz = (tile_size*tile);
+		//cout<<tile_nnz<<" is tile nnz"<<endl;
 		
+		while ((row_idx < rows) && 
+				(csr_row_ptr[row_idx] < tile_nnz)){ 
+			row_idx++;}
 
+		(*tile_ptr)[tile] = row_idx;
+	}
+	(*tile_ptr)[num_tiles] = rows;
+	
+	/*printf("Tile boundaries (row indices):\n");
+    	for (int i = 0; i <= 10; i++) {
+        	printf("tile_ptr[%d] = %d\n", i, (*tile_ptr)[i]);
+    }	*/
+}
+
+
+//just do it in cpu first geez
+void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int *csr_row_ptr, 
+		//returns 
+		uint8_t **bit_flag_array, int **y_offset_array, 
+		int **seg_offset_array, int ***empty_idx_array, int **tile_ptr){
+	//fprintf(stdout, "in make tile destriptor\n");
+	//allocate memory for returns							calloc is
+	*bit_flag_array = (uint8_t*)calloc((num_tiles*omega*sigma), sizeof(uint8_t));//slower but assured 0's
+	*seg_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
+	*y_offset_array =  	(int*)calloc(omega*num_tiles, sizeof(int));
+	//*empty_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
+
+	if (!*bit_flag_array || !*seg_offset_array || !*y_offset_array) {
+		fprintf(stderr, "descriptor memory allocation failed\n");
+		exit(1);
+	}
+	
+	uint8_t *temp_empty_rows = (uint8_t*)calloc(rows+1, sizeof(uint8_t));
+
+	if (!bit_flag_array) {
+		fprintf(stderr, "temp memory allocation failed\n");
+		exit(1);
 	}
 
 
+	for (int i = 0; i < (rows + 1); i++){
+		unsigned int row_idx = csr_row_ptr[i];
+		//fprintf(stdout, "row index is %u\n", row_idx);
+		if (csr_row_ptr[i] == csr_row_ptr[i+1]){
+			temp_empty_rows[i] = (uint8_t)1;
+		}
+		(*bit_flag_array)[row_idx] = (uint8_t)1;
+		
+	}
+
+	/*for (int i = 0; i < rows; i++){
+	       fprintf(stdout, " %02x,", temp_empty_rows[i]);
+	}*/
+	/*for (int i = 0; i < 10; i++){
+	       fprintf(stdout, " %02x,", (*bit_flag_array)[i]);
+	}*/
+	
+	//FOR SEG OFFSET for Y OFFSET
+	for (int i = 0; i < num_tiles; i++){
+		int offset = 0;
+		for (int j = 0; j < omega; j++){
+			int true_count = 0;
+			for (int k = 0; k < sigma; k++){
+				if ((*bit_flag_array)[j*sigma + k] == (uint8_t)1){
+					true_count++;
+				}
+			}
+		if (true_count == 0){
+			offset++;
+		}
+		else{
+			(*y_offset_array)[i*omega + j] = true_count;
+
+			if (offset != 0 && ((i*sigma+ j) - offset) > 0 ){
+				(*seg_offset_array)[((i*sigma+ j)) - offset] = offset;
+				offset = 0;
+			}
+		}
+		}
+	}
+
+	//EMPTY OFFSET (getting size of array)
+	//*empty_offset_array = 	(int*)calloc(omega*num_tiles, sizeof(int));
+	int empty_row_tiles = 0;
+
+	for (int i = 0; i < num_tiles - 1; i++){
+		int lower_range = (*tile_ptr)[i];
+		int upper_range = (*tile_ptr)[i+1];
+
+		for (int row = lower_range; row < upper_range; row++) {
+
+			if (temp_empty_rows[row]) {
+			    int value = (*tile_ptr)[i];
+			    (*tile_ptr)[i] = -value;
+			    empty_row_tiles++;
+			    //if (value == 0)
+			    //	{(*tile_ptr)[i] = -1;}//I couldnt figure out how to do -0
+			    break;
+			}
+		}
+	}
+	//fprintf(stdout, "number of empty row tiles is %d\n", empty_row_tiles);
+	*empty_idx_array = (int**)malloc((empty_row_tiles+1) * sizeof(int*));//+1 for zero too
+	int empty_idx = 1;
+	if (!**empty_idx_array) {
+		fprintf(stderr, "empty index array  memory allocation failed\n");
+		exit(1);
+	}
+	//EMPTY OFFSET (assigning array elements)
+	for (int tile = 0; tile < num_tiles; tile++){
+		if ((*tile_ptr)[tile] < 0){
+			
+
+			int start = std::abs((*tile_ptr)[tile]);
+			//int temp_array[1000];
+			int end = std::abs((*tile_ptr)[tile + 1]);
+
+			//pass one for size
+			int count = 0;
+			for (int i = start; i < end; i++) {
+			    if (temp_empty_rows[i]) {
+				count++;
+			    }
+			}
+
+			if (count > 0){
+				(*empty_idx_array)[empty_idx] = (int*)malloc(count * sizeof(int));
+				int idx = 0;
+			//second pass to get empty array
+			for (int i = start; i < end; i++){
+				if (temp_empty_rows[i]){	
+				
+					(*empty_idx_array)[empty_idx][idx] = i;
+					idx++;
+					}
+				}
+	/*	printf("DEBUG: Tile %d -> stored %d empty rows (first: %d, last: %d)\n",
+	       tile, count,
+	       (*empty_idx_array)[empty_idx][0],
+	       (*empty_idx_array)[empty_idx][count-1]);*/
+			empty_idx++;
+			}
+			
+		
+		}
+	}
+	//end of loop
+	//free(temp_empty_rows);
+	/*fprintf(stdout, "empty tile\n");
+	for (int i = 0; i < empty_idx; i++){
+		int count = 0;
+		while ((*empty_idx_array)[i][count] != NULL){
+		fprintf(stdout, " %d,", (*empty_idx_array)[i][count]);
+		count++;
+				}
+	}*/
+
+
+	//EMPTY ARRAY FOR all ZERO TILEs
+	int start = std::abs((*tile_ptr)[0]);
+	//int temp_array[1000];
+	int end = std::abs((*tile_ptr)[1]);
+
+	//pass one for size
+	int zcount = 0;
+	for (int i = start; i < end; i++) {
+	    if (temp_empty_rows[i]) {
+		zcount++;
+	    }
+	}
+
+	if (zcount > 0){
+		(*empty_idx_array)[0] = (int*)malloc(zcount * sizeof(int));
+		int idx = 0;
+	//second pass to get empty array
+	for (int i = start; i < end; i++){
+		if (temp_empty_rows[i]){
+
+			(*empty_idx_array)[0][idx] = i;
+			idx++;
+			}
+		}
+/*		printf("DEBUG: Tile 0 -> stored %d empty rows (first: %d, last: %d)\n",
+	       zcount,
+	       (*empty_idx_array)[0][0],
+	       (*empty_idx_array)[0][zcount-1]);*/
+	}
 }
 
 
@@ -494,7 +689,6 @@ int main(int argc, char** argv) {
     int* gpu_csr5_col_idx = NULL;
     int* gpu_csr5_row_idx = NULL;
     int* gpu_csr5_tile_ptr = NULL;
-    uint8_t* gpu_csr5_bit_flag = NULL;
 	
     int sigma = find_sigma(nnz, m);
 	//fprintf(stdout, "sigma is %d\n", sigma);     
@@ -504,17 +698,30 @@ int main(int argc, char** argv) {
     uint8_t* bit_flag_array = NULL;
     int* y_off_array = NULL;
     int* seg_off_array = NULL;
-    int* empty_array = NULL;
-    make_tile_desc(m, omega, sigma, &csr_row_ptr, 
-		  &bit_flag_array, &y_off_array, 
-		  &seg_off_array, &empty_array);
+    int** empty_array = NULL;
+    int *cpu_tile_ptr = NULL;
+	
+    make_tile_ptr(m, omega, sigma, num_tiles_p, csr_row_ptr, &cpu_tile_ptr);    
 
+    make_tile_desc(m, omega, sigma, num_tiles_p, csr_row_ptr, 
+		  &bit_flag_array, &y_off_array, 
+		  &seg_off_array, &empty_array, &cpu_tile_ptr);
+
+    uint8_t* gpu_csr5_bit_flag = NULL;
+    int* gpu_y_off_array = NULL;
+    int* gpu_seg_off_array = NULL;
+    int** gpu_empty_array = NULL;
     //host wowow
     t0 = ReadTSC();
     convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
-		        &sigma, &omega,  
-                        &num_tiles_p, &gpu_csr5_vals, &h_csr5_col_idx, 
-                        &gpu_csr5_row_idx, &gpu_csr5_tile_ptr, &gpu_csr5_bit_flag);
+		        &sigma, 	&omega,  
+                        &num_tiles_p, 		&gpu_csr5_vals, 	&gpu_csr5_col_idx, 
+                        &gpu_csr5_row_idx, 	&gpu_csr5_tile_ptr, 	&gpu_csr5_bit_flag,
+			//additional cpu/gpu things from tile desc
+			&bit_flag_array, 	&seg_off_array, 	&empty_array,
+		    	&y_off_array, 		&gpu_y_off_array,	&gpu_seg_off_array,
+			&gpu_empty_array);
+
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation
@@ -523,7 +730,6 @@ int main(int argc, char** argv) {
     int* d2_csr5_row_idx = NULL;
     int* d2_csr5_tile_ptr = NULL;
     unsigned int* d2_csr5_tile_desc = NULL;
-    // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
     int csr5_capacity2 = csr5_num_tiles * 32 * 16;
     // Values
 

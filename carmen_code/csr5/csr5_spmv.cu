@@ -99,21 +99,61 @@ __global__ void assign_csr5_col(int* og_col,
 }
 
 
+__global__ void assign_csr5_bit(uint8_t* og_bit,
+                int sigma, int omega,
+                uint8_t* csr5_bit, size_t pitch_bit,
+                int nnz, int num_tiles)
+{
+        //attempt to assign gpu columns
+        int tile_col = blockIdx.x;
+        int tile_row = blockIdx.y;
+        int local_pos = threadIdx.x;
+        //T* pElement = (T*)((char*)BaseAddress + Row * pitch) + Column;
+        //
+        int global_idx = (tile_row * num_tiles + tile_col) * sigma + local_pos;
 
+        if (global_idx < nnz){
+                int target_row = tile_row;
+                int target_col = tile_col*sigma + local_pos;
+
+                MATRIX_ACCESS(csr5_bit, pitch_bit, target_row, target_col) = og_bit[global_idx];
+
+
+        if (tile_row == 0 && tile_col == 0 && local_pos < 5) {
+            printf("Kernel: Writing og_bit[%d]=%d to csr5[%d][%d]\n",
+                   global_idx, og_bit[global_idx], target_row, target_col);
+        }
+
+        if (target_col == 0 && target_row < 3) {
+            printf("First column: csr5[%d][0] = %d\n",
+                   target_row, og_bit[global_idx]);
+                }
+        }
+
+        __syncthreads();
+
+        if (tile_row == 0 && tile_col == 0 && local_pos == 0) {
+                printf("Kernel completed: assigned %d values to %dx%d tiles\n",
+                nnz, omega, num_tiles);
+        }
+}
+
+
+/*
 __global__ void gen_tile_ptr(int* tile_ptr,
 		int sigma, int omega, 
 		int* row_ptr){
 	int tile_col = blockIdx.x;
 	int tile_row = blockIdx.y;
 	int local_pos = threadIdx.x;
-	int global_tid = (tile_row * /*num_tiles + */ tile_col) * sigma + local_pos;
+	int global_tid = (tile_row * num_tiles +  tile_col) * sigma + local_pos;
 
 	int bnd = local_pos * sigma * omega;
 	//tile_ptr[local_pos] = binary_search(*row_ptr, bnd) -1;
 
 		
-
-}
+something to come back to 
+}*/
 
 
 void convert_csr_to_csr5_gpu(
@@ -129,9 +169,14 @@ void convert_csr_to_csr5_gpu(
     int** gpu_csr5_col_idx,
     int** gpu_csr5_row_ptr, 
     int** gpu_csr5_tile_ptr,
-    uint32_t** gpu_csr5_tile_desc
+    uint8_t** gpu_csr5_bit_array,
+    //new
+    uint8_t **cpu_csr5_bit_array, 
+    int** seg_array, int*** empty_array,
+    int** y_array, int **gpu_y_array, 
+    int **gpu_seg_array, int*** gpu_empty_array
 ){	
-	size_t pitch_val, pitch_col;
+	size_t pitch_val, pitch_col, pitch_bit;
 	//allocate memory for value blocks, 
 	//cudaMallocPitch(gpu_csr5_val, omega, sigma * num_tiles);
 	cudaMallocPitch((void**)gpu_csr5_val, &pitch_val, 
@@ -147,7 +192,8 @@ void convert_csr_to_csr5_gpu(
 	//ASSIGNING VALUES - LAUNCH KERNEL with <<< >>>
 	dim3 blocks(*num_tiles, *omega);  // grid dimensions
 	dim3 threads(*sigma);             // block dimensions
-	    
+	
+    	//====================================================	
 	//ASSIGNING VALUES
 	assign_csr5_val<<<blocks, threads>>>(
 		d_og_val, 
@@ -169,6 +215,7 @@ void convert_csr_to_csr5_gpu(
                    *sigma);
         printf("Allocated with pitch: %zu bytes\n", pitch_col);
 	
+    	//====================================================	
 	//ASSIGNING COLLUMNS
 	assign_csr5_col<<<blocks, threads>>>(
 			d_og_col, *sigma, 
@@ -179,21 +226,39 @@ void convert_csr_to_csr5_gpu(
 	// then clean temporary GPU memory
 	cudaFree(d_og_col);
 
+	uint8_t* d_og_bit; int total_tile = (*num_tiles)*(*omega)*(*sigma);
+
+	printf("total tile is %d\n", total_tile);
+    	cudaMalloc(&d_og_bit, total_tile * sizeof(uint8_t));
+    	cudaMemcpy(d_og_bit, cpu_csr5_bit_array, total_tile * sizeof(uint8_t), cudaMemcpyHostToDevice);
+
+	printf("total tile is %d\n", total_tile);
+        // allocate bit flag
+        cudaMallocPitch((void**)gpu_csr5_bit_array, &pitch_bit,
+                   (*omega) * (*num_tiles) * sizeof(uint8_t),
+                   *sigma);
+
+        printf("Allocated with pitch: %zu bytes\n", pitch_bit);
+    	//====================================================	
+       //ASSIGNING BIT FLAG
+        assign_csr5_bit<<<blocks, threads>>>(
+                d_og_bit,
+                *sigma, *omega,
+                *gpu_csr5_bit_array, pitch_bit,
+                total_tile, *num_tiles
+        );
+        cudaDeviceSynchronize();  // waaait for kernel to finish  
+        // then clean temporary GPU memory
+        cudaFree(d_og_bit);
+
+
+
 	//1D allocation and can copy memory for rowptr since they the same
 	cudaMalloc((void**)gpu_csr5_row_ptr, (m+1)*sizeof(int));
 	cudaMemcpy(*gpu_csr5_row_ptr, og_row_ptr, (m+1)*sizeof(int), cudaMemcpyHostToDevice);
 	
 		//also mempry for the tile ptr
-	cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles)*sizeof(int));//maybe this should be unsigned int though
-	//GENERATE ROW POINTER
-	gen_tile_ptr<<<blocks, threads>>>(*gpu_csr5_tile_ptr,
-		*sigma, *omega, 
-		*gpu_csr5_row_ptr
-	);
-	
-
-
-
+	cudaMalloc((void**)gpu_csr5_tile_ptr,(*num_tiles+1)*sizeof(int));//maybe this should be unsigned int though
 
 	
 

@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define MAX_ITER 5
+#define P_TYPE float
+
 static inline uint64_t ReadTSC(void)
 {
 #if defined(__i386__)
@@ -40,6 +43,6 @@ static inline uint64_t ReadTSC(void)
 
 void InitTSC(void);
 
-double ElapsedTime(uint64_t ticks);
+P_TYPE ElapsedTime(uint64_t ticks);
 
 #endif // COMMON_H_

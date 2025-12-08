@@ -15,7 +15,6 @@
 #include "csr5.h"
 #include "gpu_spmv.h"
 
-
 #include <string>
 
 #define MAX_FILENAME 256
@@ -33,24 +32,24 @@
 #define GPU_CSR5_TIME    8
 #define LOGGING
 
-double calc_diff(int m, const double* r1, const double* r2) {
-    double diff = 0.0;
+P_TYPE calc_diff(int m, const P_TYPE* r1, const P_TYPE* r2) {
+    P_TYPE diff = 0.0;
     for (int i=0; i<m; i++) {
-        double err = r1[i] - r2[i];
+        P_TYPE err = r1[i] - r2[i];
         diff += err * err;
     }
     return sqrt(diff);
 }
 
 
-void log_csv(char* matrix, const char* name, int config, double time_s, double conv_s, int nnz, int m, int n, double err) {
+void log_csv(char* matrix, const char* name, int config, P_TYPE time_s, P_TYPE conv_s, int nnz, int m, int n, P_TYPE err) {
 #ifdef LOGGING
      	// GFLOPS = (2 * nnz ops) / (time in seconds) / 10^9
-    double gflops = (2.0 * nnz) / (time_s * 1e9);
+    P_TYPE gflops = (2.0 * nnz) / (time_s * 1e9);
 
     // Effective Bandwidth (APproximation) THIS IS WHAT WE CARE ABOUT!
-    double bytes = (nnz * 12.0) + (m * 16.0) + (n * 8.0); // CSR: val (8 bytes) + col_idx (4 bytes) + row_ptr (4 bytes) + x (8 bytes) + y (8 bytes)
-    double gbps = bytes / (time_s * 1e9);
+    P_TYPE bytes = (nnz * 12.0) + (m * 16.0) + (n * 8.0); // CSR: val (8 bytes) + col_idx (4 bytes) + row_ptr (4 bytes) + x (8 bytes) + y (8 bytes)
+    P_TYPE gbps = bytes / (time_s * 1e9);
     fprintf(stdout, "%s,%s,%d,%.9f,%.9f,%.4f,%.4f,%e\n", matrix, name, config, time_s, conv_s, gflops, gbps, err);
 #endif
 }
@@ -60,13 +59,13 @@ extern "C" void convert_csr_to_sell_c_sigma(
     int m, 
     const unsigned int* csr_row_ptr, 
     const unsigned int* csr_col_ind, 
-    const double* csr_vals, 
+    const P_TYPE* csr_vals, 
     int SLICE_THICKNESS, 
     int* m_padded, 
     int* total_nnz, 
     unsigned int** sell_slice_ptr, 
     unsigned int** sell_col_ind, 
-    double** sell_vals,
+    P_TYPE** sell_vals,
     int** sigma_permutation) {
     // --- Step 1: Compute and sort the permutation map based on row lengths ---
     // Allocate permutation array
@@ -113,7 +112,7 @@ extern "C" void convert_csr_to_sell_c_sigma(
     assert(*sell_slice_ptr);
     *sell_col_ind = (unsigned int*)malloc(sizeof(unsigned int) * *total_nnz);
     assert(*sell_col_ind);
-    *sell_vals = (double*)malloc(sizeof(double) * *total_nnz);
+    *sell_vals = (P_TYPE*)malloc(sizeof(P_TYPE) * *total_nnz);
     assert(*sell_vals);
 
     // --- Step 4: Fill the SELL-C Arrays ---
@@ -160,7 +159,7 @@ int main(int argc, char** argv) {
 
 
     // Initialize timess
-    double timer[NUM_TIMERS];
+    P_TYPE timer[NUM_TIMERS];
     uint64_t t0;
     for(unsigned int i = 0; i < NUM_TIMERS; i++) {
         timer[i] = 0.0;
@@ -190,7 +189,7 @@ int main(int argc, char** argv) {
     int nnz;
     int *row_ind;
     int *col_ind;
-    double *val;
+    P_TYPE *val;
     float time_ms; // Variable to capture kernel GPU time
     t0 = ReadTSC();
     
@@ -206,7 +205,7 @@ int main(int argc, char** argv) {
     // Load the input vector x 
     char vectorName[MAX_FILENAME];
     strcpy(vectorName, argv[2]);
-    double* x;
+    P_TYPE* x;
     int vector_size;
     t0 = ReadTSC();
     read_vector(vectorName, &x, &vector_size);
@@ -215,18 +214,18 @@ int main(int argc, char** argv) {
 
     unsigned int* drp; // row pointer on GPU
     unsigned int* dci; // col index on GPU
-    double* dv; // values on GPU
-    double* dx; // input x on GPU
-    double* db; // result b on GPU
-    double* h_check; // buffer for verification
-	double err;
+    P_TYPE* dv; // values on GPU
+    P_TYPE* dx; // input x on GPU
+    P_TYPE* db; // result b on GPU
+    P_TYPE* h_check; // buffer for verification
+	P_TYPE err;
     
     // initializing where to store the different formats' arrays
     unsigned int* csr_row_ptr = NULL; 
     unsigned int* csr_col_ind = NULL;  
-    double* csr_vals = NULL; 
+    P_TYPE* csr_vals = NULL; 
     unsigned int* ell_col_ind = NULL;
-    double* ell_vals = NULL;
+    P_TYPE* ell_vals = NULL;
     int n_new = 0;
 
     unsigned int * u_row_ind = (unsigned int *) malloc(sizeof(unsigned int) * nnz);
@@ -245,7 +244,7 @@ int main(int argc, char** argv) {
     // ==========================================
     // Calculate CPU SPMV (benchmark/correctness))
     // ==========================================
-    double* bb = (double*) malloc(sizeof(double) * m); assert(bb);
+    P_TYPE* bb = (P_TYPE*) malloc(sizeof(P_TYPE) * m); assert(bb);
     for(unsigned int i = 0; i < MAX_ITER; i++) {
         spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
     }
@@ -253,7 +252,7 @@ int main(int argc, char** argv) {
     // ===========================================
     // Calculate COO on GPU
     // ===========================================
-    h_check = (double*)malloc(sizeof(double) * m);
+    h_check = (P_TYPE*)malloc(sizeof(P_TYPE) * m);
 
     // allocate_coo_gpu(u_row_ind, u_col_ind, val, m, n, nnz, x, 
     //                  &drp, &dci, &dv, &dx, &db);
@@ -292,35 +291,35 @@ int main(int argc, char** argv) {
     };
 
     // scalar csr
-    for (int i = 0; i < num_tests; i++) {
-        int threads = thread_counts[i];
+    // for (int i = 0; i < num_tests; i++) {
+    //     int threads = thread_counts[i];
 
-        scalar_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
+    //     scalar_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
 
-        get_result_gpu(db, h_check, m);
-	    cudaDeviceSynchronize();
+    //     get_result_gpu(db, h_check, m);
+	//     cudaDeviceSynchronize();
 
-        err = calc_diff(m, bb, h_check);
-        log_csv(mat_name, "CSR-SC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
-    };
+    //     err = calc_diff(m, bb, h_check);
+    //     log_csv(mat_name, "CSR-SC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+    // };
 
-    for (int i = 0; i < num_tests; i++) {
-        int threads = thread_counts[i];
+    // for (int i = 0; i < num_tests; i++) {
+    //     int threads = thread_counts[i];
 
-        vector_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
+    //     vector_csr(drp, dci, dv, m, n, nnz, dx, db, &time_ms);
 
-        get_result_gpu(db, h_check, m);
-	    cudaDeviceSynchronize();
+    //     get_result_gpu(db, h_check, m);
+	//     cudaDeviceSynchronize();
 
-        err = calc_diff(m, bb, h_check);
-        log_csv(mat_name, "CSR-VEC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
-    };
+    //     err = calc_diff(m, bb, h_check);
+    //     log_csv(mat_name, "CSR-VEC", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
+    // };
 
     // ==========================================
     // Execute ELL SPMV
     // ==========================================
     unsigned int* dec; // row pointer on GPU
-    double* dev; // col index on GPU
+    P_TYPE* dev; // col index on GPU
     allocate_ell_gpu(ell_col_ind, ell_vals, m, n_new, nnz, x, &dec, &dev, &dx,
                      &db);
     timer[GPU_ALLOC_TIME] += ElapsedTime(ReadTSC() - t0);
@@ -332,27 +331,27 @@ int main(int argc, char** argv) {
         get_result_gpu(db, h_check, m);
 	    cudaDeviceSynchronize();
 
-        double err = calc_diff(m, h_check, bb);
+        P_TYPE err = calc_diff(m, h_check, bb);
         log_csv(mat_name, "ELL", threads, time_ms / 1000.0, 0.0, nnz, m, n, err);
 
 //        fprintf(stdout, " ELL Threads: %d, Time (ms): %f ms\n", threads, time_ms);
     }
 
     // copy data back from the GPU
-    double* be = (double*) malloc(sizeof(double) * m);;
+    P_TYPE* be = (P_TYPE*) malloc(sizeof(P_TYPE) * m);;
     assert(be);
     t0 = ReadTSC();
     get_result_gpu(db, be, m);
 
     // --- DEBUGGING CODE START ---
     if (bb == NULL) {
-        bb = (double*) malloc(sizeof(double) * m);
+        bb = (P_TYPE*) malloc(sizeof(P_TYPE) * m);
         for(unsigned int i = 0; i < MAX_ITER; i++) spmv(csr_row_ptr, csr_col_ind, csr_vals, m, n, nnz, x, bb);
     }
     
-    double ell_diff = 0.0;
+    P_TYPE ell_diff = 0.0;
     for(int i=0; i<m; i++) {
-        double err = be[i] - bb[i];
+        P_TYPE err = be[i] - bb[i];
         ell_diff += err * err;
     }
 //    printf("DEBUG: ELL 2-Norm: %e\n", sqrt(ell_diff));
@@ -369,7 +368,7 @@ int main(int argc, char** argv) {
     int m_padded_sell = 0; int total_nnz_sell = 0;
     unsigned int *h_sell_slice_ptr = NULL;
     unsigned int *h_sell_col_ind = NULL;
-    double *h_sell_vals = NULL;
+    P_TYPE *h_sell_vals = NULL;
     int *h_sigma_permutation = NULL; // permutation map
     // Run converson on Host CPU
     t0 = ReadTSC();
@@ -383,10 +382,10 @@ int main(int argc, char** argv) {
     // Allocate on GPU
     unsigned int *d_sell_slice_ptr = NULL; 
     unsigned int *d_sell_col_ind = NULL;
-    double *d_sell_vals = NULL;
+    P_TYPE *d_sell_vals = NULL;
     CopyData(h_sell_slice_ptr, num_slices + 1, sizeof(unsigned int), &d_sell_slice_ptr);
     CopyData(h_sell_col_ind, total_nnz_sell, sizeof(unsigned int), &d_sell_col_ind);
-    CopyData(h_sell_vals, total_nnz_sell, sizeof(double), &d_sell_vals);
+    CopyData(h_sell_vals, total_nnz_sell, sizeof(P_TYPE), &d_sell_vals);
     // Run SPMV Benchmark Loop
     spmv_gpu_sellc(m, num_slices, SLICE_THICKNESS, 
                     d_sell_slice_ptr, d_sell_col_ind, d_sell_vals,
@@ -398,12 +397,12 @@ int main(int argc, char** argv) {
     fprintf(stdout, " SELL-C-Sigma Time (ms): %f ms\n", time_ms);
     #endif
     // Unscramble and verify correctness
-    double* h_y_sigma = (double*) malloc(sizeof(double) * m_padded_sell);
-    cudaMemcpy(h_y_sigma, db, m * sizeof(double), cudaMemcpyDeviceToHost);
-    double sigma_diff = 0.0;
+    P_TYPE* h_y_sigma = (P_TYPE*) malloc(sizeof(P_TYPE) * m_padded_sell);
+    cudaMemcpy(h_y_sigma, db, m * sizeof(P_TYPE), cudaMemcpyDeviceToHost);
+    P_TYPE sigma_diff = 0.0;
     for (int i=0; i<m; i++) {
         int original_idx = h_sigma_permutation[i];
-        double err = h_y_sigma[i] - bb[original_idx];
+        P_TYPE err = h_y_sigma[i] - bb[original_idx];
         sigma_diff += err * err;
         // Store unscrambled result for final save file
         be[original_idx] = h_y_sigma[i];
@@ -411,7 +410,7 @@ int main(int argc, char** argv) {
 
 #ifdef LOGGING
     log_csv(mat_name, "SELL-C-Sigma", SLICE_THICKNESS, time_ms / 1000.0, 0.0, nnz, m, n, sqrt(sigma_diff));
-//    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
+    fprintf(stdout, "2-Norm difference between CSR and SELL-C-Sigma results: %e\n", sigma_diff);
 #endif
     // Free SELL-C specific memory
     cudaFree(d_sell_slice_ptr);
@@ -427,7 +426,7 @@ int main(int argc, char** argv) {
     // ==========================================
 //    fprintf(stdout, "Executing GPU CSR5 SpMV ... \n");
     int csr5_num_tiles;
-    double *h_csr5_vals = NULL;
+    P_TYPE *h_csr5_vals = NULL;
     int* h_csr5_col_idx = NULL;
     int* h_csr5_row_idx = NULL;
     int* h_csr5_tile_ptr = NULL;
@@ -441,7 +440,7 @@ int main(int argc, char** argv) {
     timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     // GPU allocation
-    double* d_csr5_vals = NULL;
+    P_TYPE* d_csr5_vals = NULL;
     int* d_csr5_col_idx = NULL;
     int* d_csr5_row_idx = NULL;
     int* d_csr5_tile_ptr = NULL;
@@ -449,8 +448,8 @@ int main(int argc, char** argv) {
     // Capacity MORE HANDWAVING IDK WHAT"S GOING ON HERE EITHER TODO 
     int csr5_capacity = csr5_num_tiles * 32 * 16;
     // Values
-    cudaMalloc((void**)&d_csr5_vals, csr5_capacity * sizeof(double));
-    cudaMemcpy(d_csr5_vals, h_csr5_vals, csr5_capacity * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&d_csr5_vals, csr5_capacity * sizeof(P_TYPE));
+    cudaMemcpy(d_csr5_vals, h_csr5_vals, csr5_capacity * sizeof(P_TYPE), cudaMemcpyHostToDevice);
     // Column Indices
     cudaMalloc((void**)&d_csr5_col_idx, csr5_capacity * sizeof(int));
     cudaMemcpy(d_csr5_col_idx, h_csr5_col_idx, csr5_capacity * sizeof(int), cudaMemcpyHostToDevice);
@@ -473,7 +472,7 @@ int main(int argc, char** argv) {
     timer[GPU_CSR5_TIME] += (time_ms / 1000.0) * MAX_ITER; // convert to seconds and multiply by iterations
     // Verify and log
     get_result_gpu(db, h_check, m);
-    double csr5_diff = calc_diff(m, h_check, bb);
+    P_TYPE csr5_diff = calc_diff(m, h_check, bb);
     log_csv(mat_name, "CSR5", 32, time_ms / 1000.0, 0.0, nnz, m, n, csr5_diff);
 //    fprintf(stdout, " CSR5 Time (ms): %f ms\n", time_ms);
 
@@ -496,12 +495,12 @@ int main(int argc, char** argv) {
 
 
     // Calculate correctness
-    double* c = (double*) malloc(sizeof(double) * m);
+    P_TYPE* c = (P_TYPE*) malloc(sizeof(P_TYPE) * m);
     assert(c);
     for(int i = 0; i < m; i++) {
         c[i] = be[i] - bb[i];
     }
-    double norm = dnrm2(m, c, 1);   
+    P_TYPE norm = dnrm2(m, c, 1);   
 //    printf("2-Norm between CPU and GPU answers: %e\n", norm);
 
 
@@ -680,27 +679,27 @@ void read_info(char* fileName, int* is_sym)
    input parameters:
        int*	row_ind		list or row indices (per non-zero)
        int*	col_ind		list or col indices (per non-zero)
-       double*	val		list or values  (per non-zero)
+       P_TYPE*	val		list or values  (per non-zero)
        int	m		# of rows
        int	n		# of columns
        int	n		# of non-zeros
    output parameters:
        unsigned int** 	csr_row_ptr	pointer to row pointers (per row)
        unsigned int** 	csr_col_ind	pointer to column indices (per non-zero)
-       double** 	csr_vals	pointer to values (per non-zero)
+       P_TYPE** 	csr_vals	pointer to values (per non-zero)
    return paramters:
        none
  */
-void convert_coo_to_csr(int* row_ind, int* col_ind, double* val, 
+void convert_coo_to_csr(int* row_ind, int* col_ind, P_TYPE* val, 
                         int m, int n, int nnz,
                         unsigned int** csr_row_ptr, unsigned int** csr_col_ind,
-                        double** csr_vals)
+                        P_TYPE** csr_vals)
 
 {
     // Temporary pointers
     unsigned int* row_ptr_;
     unsigned int* col_ind_;
-    double* vals_;
+    P_TYPE* vals_;
     
     // We now how large the data structures should be
     // csr_row_ptr -> m + 1
@@ -710,7 +709,7 @@ void convert_coo_to_csr(int* row_ind, int* col_ind, double* val,
     assert(row_ptr_);
     col_ind_ = (unsigned int*) malloc(sizeof(unsigned int) * nnz);
     assert(col_ind_);
-    vals_ = (double*) malloc(sizeof(double) * nnz);
+    vals_ = (P_TYPE*) malloc(sizeof(P_TYPE) * nnz);
     assert(vals_);
 
     // Now determine how many non-zero elements are in each row
@@ -764,12 +763,12 @@ void convert_coo_to_csr(int* row_ind, int* col_ind, double* val,
    input parameters:
        char*	fileName	name of the file containing the vector
    output parameters:
-       double**	vector		pointer to the vector
+       P_TYPE**	vector		pointer to the vector
        int*	vecSize 	pointer to # elements in the vector
    return parameters:
        none
  */
-void read_vector(char* fileName, double** vector, int* vecSize)
+void read_vector(char* fileName, P_TYPE** vector, int* vecSize)
 {
     FILE* fp = fopen(fileName, "r");
     assert(fp);
@@ -778,7 +777,7 @@ void read_vector(char* fileName, double** vector, int* vecSize)
     fclose(fp);
 
     unsigned int vector_size = atoi(line);
-    double* vector_ = (double*) malloc(sizeof(double) * vector_size);
+    P_TYPE* vector_ = (P_TYPE*) malloc(sizeof(P_TYPE) * vector_size);
 
     fp = fopen(fileName, "r");
     assert(fp); 
@@ -802,8 +801,8 @@ void read_vector(char* fileName, double** vector, int* vecSize)
 /* SpMV function for CSR stored sparse matrix
  */
 void spmv(unsigned int* csr_row_ptr, unsigned int* csr_col_ind, 
-          double* csr_vals, int m, int n, int nnz, 
-          double* vector_x, double *res)
+          P_TYPE* csr_vals, int m, int n, int nnz, 
+          P_TYPE* vector_x, P_TYPE *res)
 {
     // first initialize res to 0
     #pragma omp parallel for schedule(static)
@@ -825,7 +824,7 @@ void spmv(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
 
 /* Save result vector in a file
  */
-void store_result(char *fileName, double* res, int m)
+void store_result(char *fileName, P_TYPE* res, int m)
 {
     FILE* fp = fopen(fileName, "w");
     assert(fp);
@@ -840,7 +839,7 @@ void store_result(char *fileName, double* res, int m)
 
 /* Print timing information 
  */
-void print_time(double timer[])
+void print_time(P_TYPE timer[])
 {
     fprintf(stdout, "Module\t\tTime\n");
     fprintf(stdout, "Load\t\t");
@@ -869,7 +868,7 @@ void print_time(double timer[])
 
 
 void expand_symmetry(int m, int n, int* nnz_, int** row_ind, int** col_ind, 
-                     double** val)
+                     P_TYPE** val)
 {
     // fprintf(stdout, "Expanding symmetric matrix ... ");
     int nnz = *nnz_;
@@ -886,12 +885,12 @@ void expand_symmetry(int m, int n, int* nnz_, int** row_ind, int** col_ind,
     assert(_row_ind);
     int* _col_ind = (int*) malloc(sizeof(int) * (nnz + not_diag));
     assert(_col_ind);
-    double* _val = (double*) malloc(sizeof(double) * (nnz + not_diag));
+    P_TYPE* _val = (P_TYPE*) malloc(sizeof(P_TYPE) * (nnz + not_diag));
     assert(_val);
 
     memcpy(_row_ind, *row_ind, sizeof(int) * nnz);
     memcpy(_col_ind, *col_ind, sizeof(int) * nnz);
-    memcpy(_val, *val, sizeof(double) * nnz);
+    memcpy(_val, *val, sizeof(P_TYPE) * nnz);
     int index = nnz;
     for(int i = 0; i < nnz; i++) {
         if((*row_ind)[i] != (*col_ind)[i]) {
@@ -917,9 +916,9 @@ void expand_symmetry(int m, int n, int* nnz_, int** row_ind, int** col_ind,
 }
 
 
-double ddot(const int n, double* x, const int incx, double* y, const int incy)
+P_TYPE ddot(const int n, P_TYPE* x, const int incx, P_TYPE* y, const int incy)
 {
-    double sum = 0.0;
+    P_TYPE sum = 0.0;
     int max = (n + incx - 1) / incx;
     #pragma omp parallel for reduction(+:sum) schedule(static)
     for(int i = 0; i < max; i++) {
@@ -928,16 +927,16 @@ double ddot(const int n, double* x, const int incx, double* y, const int incy)
     return sum;
 }
 
-double dnrm2(const int n, double* x, const int incx)
+P_TYPE dnrm2(const int n, P_TYPE* x, const int incx)
 {
-    double nrm = ddot(n, x, incx, x, incx);
+    P_TYPE nrm = ddot(n, x, incx, x, incx);
     return sqrt(nrm);
 }
 
 
 void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
-                        double* csr_vals, int m, int n, int nnz, 
-                        unsigned int** ell_col_ind, double** ell_vals, 
+                        P_TYPE* csr_vals, int m, int n, int nnz, 
+                        unsigned int** ell_col_ind, P_TYPE** ell_vals, 
                         int* n_new)
 {
     // --- Find the max number of non-zeros per row (max_row_length) --- 
@@ -954,7 +953,7 @@ void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
     // --- Allocate memory for ELL arrays on the host (CPU) --- 
     *ell_col_ind = (unsigned int*) malloc(sizeof(unsigned int) * ell_nnz_padded);
     assert(*ell_col_ind);
-    *ell_vals = (double*) malloc(sizeof(double) * ell_nnz_padded);
+    *ell_vals = (P_TYPE*) malloc(sizeof(P_TYPE) * ell_nnz_padded);
     assert(*ell_vals);
 
     // --- Initialize ELL arrays to zero for padding use (-1) for col/row and 0 for vals --- 
@@ -986,8 +985,8 @@ void convert_csr_to_ell(unsigned int* csr_row_ptr, unsigned int* csr_col_ind,
 
 
 // Code from the third homework for cpu calculation of CSR and COO
-void spmv_coo_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals, 
-              int m, int n, int nnz, double* vector_x, double *res, 
+void spmv_coo_cpu(unsigned int* row_ind, unsigned int* col_ind, P_TYPE* vals, 
+              int m, int n, int nnz, P_TYPE* vector_x, P_TYPE *res, 
               omp_lock_t* writelock)
 {
     #pragma omp parallel for
@@ -1012,8 +1011,8 @@ void spmv_coo_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals,
     }
 }
 
-void spmv_coo_ser_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals, 
-                  int m, int n, int nnz, double* vector_x, double *res)
+void spmv_coo_ser_cpu(unsigned int* row_ind, unsigned int* col_ind, P_TYPE* vals, 
+                  int m, int n, int nnz, P_TYPE* vector_x, P_TYPE *res)
 {
     // Serial version for COO SpMV
     // Initialize result vector to zero
@@ -1031,12 +1030,12 @@ void spmv_coo_ser_cpu(unsigned int* row_ind, unsigned int* col_ind, double* vals
 /* SpMV function for CSR stored sparse matrix
  */
 void spmv_ser_cpu(unsigned int* csr_row_ptr, unsigned int* csr_col_ind, 
-              double* csr_vals, int m, int n, int nnz, 
-              double* vector_x, double *res)
+              P_TYPE* csr_vals, int m, int n, int nnz, 
+              P_TYPE* vector_x, P_TYPE *res)
 {
     // Serial vereion for SpMV CSR format
     for (int i = 0; i < m; i++) {
-        double sum = 0.0;
+        P_TYPE sum = 0.0;
         for (int j = csr_row_ptr[i]; j<csr_row_ptr[i+1]; j++) {
             sum += csr_vals[j] * vector_x[csr_col_ind[j]];
         }

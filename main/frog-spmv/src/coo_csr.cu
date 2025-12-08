@@ -21,15 +21,15 @@ inline void check_cuda(cudaError_t result, const char* const func, const char* c
 #define WARP_SIZE 32
 
 void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind, 
-                      double* vals, int m, int n, int nnz, double* x, 
+                      P_TYPE* vals, int m, int n, int nnz, P_TYPE* x, 
                       unsigned int** dev_row_ptr, unsigned int** dev_col_ind,
-                      double** dev_vals, double** dev_x, double** dev_b)
+                      P_TYPE** dev_vals, P_TYPE** dev_x, P_TYPE** dev_b)
 {
     // allocate memory for csr data
     unsigned int row_size = sizeof(unsigned int) * (m + 1);
     unsigned int col_size = sizeof(unsigned int) * nnz;
-    unsigned int val_size = sizeof(double) * nnz;
-    unsigned int x_size = sizeof(double) * n;
+    unsigned int val_size = sizeof(P_TYPE) * nnz;
+    unsigned int x_size = sizeof(P_TYPE) * n;
 
     cudaMalloc(dev_row_ptr, row_size);
     cudaMalloc(dev_col_ind, col_size);
@@ -43,19 +43,19 @@ void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind,
     cudaMemcpy(*dev_x, x, x_size, cudaMemcpyHostToDevice);
 
     // allocate memory for results (b)
-    cudaMalloc(dev_b, sizeof(double) * m);
+    cudaMalloc(dev_b, sizeof(P_TYPE) * m);
 }
 
 void allocate_coo_gpu(unsigned int* row_ind, unsigned int* col_ind, 
-                      double* vals, int m, int n, int nnz, double* x, 
+                      P_TYPE* vals, int m, int n, int nnz, P_TYPE* x, 
                       unsigned int** dev_row_ind, unsigned int** dev_col_ind,
-                      double** dev_vals, double** dev_x, double** dev_b)
+                      P_TYPE** dev_vals, P_TYPE** dev_x, P_TYPE** dev_b)
 {
     // allocate memory for csr data
     unsigned int row_size = sizeof(unsigned int) * nnz;
     unsigned int col_size = sizeof(unsigned int) * nnz;
-    unsigned int val_size = sizeof(double) * nnz;
-    unsigned int x_size = sizeof(double) * n;
+    unsigned int val_size = sizeof(P_TYPE) * nnz;
+    unsigned int x_size = sizeof(P_TYPE) * n;
 
     cudaMalloc(dev_row_ind, row_size);
     cudaMalloc(dev_col_ind, col_size);
@@ -69,23 +69,23 @@ void allocate_coo_gpu(unsigned int* row_ind, unsigned int* col_ind,
     cudaMemcpy(*dev_x, x, x_size, cudaMemcpyHostToDevice);
 
     // allocate memory for results (b)
-    cudaMalloc(dev_b, sizeof(double) * m);
-    cudaMemset(*dev_b, 0, m * sizeof(double));
+    cudaMalloc(dev_b, sizeof(P_TYPE) * m);
+    cudaMemset(*dev_b, 0, m * sizeof(P_TYPE));
 }
 
-void get_result_gpu(double* dev_b, double* b, int m)
+void get_result_gpu(P_TYPE* dev_b, P_TYPE* b, int m)
 {
-    cudaMemcpy(b, dev_b, sizeof(double) * m, cudaMemcpyDeviceToHost);
+    cudaMemcpy(b, dev_b, sizeof(P_TYPE) * m, cudaMemcpyDeviceToHost);
     cudaFree(dev_b);
 }
 
-__global__ void scalar_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
-                        double* x, double* b) 
+__global__ void scalar_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, P_TYPE* vals, int m, int n, int nnz, 
+                        P_TYPE* x, P_TYPE* b) 
 {
     const int row = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (row < m) {
-        double prod = 0;
+        P_TYPE prod = 0;
         for (int i = row_ptr[row]; i < row_ptr[row+1]; i++) {
             prod += vals[i] * x[col_ind[i]];
         }
@@ -93,8 +93,8 @@ __global__ void scalar_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, 
     }
 }
 
-__host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
-                    double* x, double* b, float* time_ms) 
+__host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, P_TYPE* vals, int m, int n, int nnz, 
+                    P_TYPE* x, P_TYPE* b, float* time_ms) 
 {
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start));
@@ -122,8 +122,8 @@ __host__ void scalar_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
     checkCudaErrors(cudaEventDestroy(stop));
 }
 
-__global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
-                    double* x, double* b) 
+__global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, P_TYPE* vals, int m, int n, int nnz, 
+                    P_TYPE* x, P_TYPE* b) 
 {
     //
     const int warp = threadIdx.x / 32;
@@ -133,7 +133,7 @@ __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, 
     int row_idx = blockIdx.x * warps_per_block + warp; // just 1 warp per row
     int subrow = gridDim.x * warps_per_block;
 
-    double prod = 0.0;
+    P_TYPE prod = 0.0;
 
     for (int row = row_idx; row < m; row += subrow) {
         prod = 0.0;
@@ -152,8 +152,8 @@ __global__ void vector_csr_kernel(unsigned int* col_ind, unsigned int* row_ptr, 
     }
 }
 
-__host__ void vector_csr(unsigned int* col_ind, unsigned int* row_ptr, double* vals, int m, int n, int nnz, 
-                    double* x, double* b, float* time_ms) 
+__host__ void vector_csr(unsigned int* col_ind, unsigned int* row_ptr, P_TYPE* vals, int m, int n, int nnz, 
+                    P_TYPE* x, P_TYPE* b, float* time_ms) 
 {
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start));
@@ -179,22 +179,22 @@ __host__ void vector_csr(unsigned int* col_ind, unsigned int* row_ptr, double* v
     checkCudaErrors(cudaEventDestroy(stop));
 }
 
-__global__ void scalar_coo_kernel(unsigned int* col_ind, unsigned int* row_ind, double* vals, int m, int n, int nnz, 
-                    double* x, double* b) 
+__global__ void scalar_coo_kernel(unsigned int* col_ind, unsigned int* row_ind, P_TYPE* vals, int m, int n, int nnz, 
+                    P_TYPE* x, P_TYPE* b) 
 {
     int ind = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (ind < nnz) {
         int row = row_ind[ind];
         int col = col_ind[ind];
-        double val = vals[ind];
+        P_TYPE val = vals[ind];
 
         atomicAdd(&b[row], val * x[col]);
     }
 }
 
-__host__ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, double* vals, int m, int n, int nnz, 
-                    double* x, double* b, float* time_ms)
+__host__ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, P_TYPE* vals, int m, int n, int nnz, 
+                    P_TYPE* x, P_TYPE* b, float* time_ms)
 {
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start));

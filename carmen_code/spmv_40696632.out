@@ -1,0 +1,29 @@
+Matrix file name: bcsstk/bcsstk18.mtx ... file loaded.
+Converting COO to CSR...done
+Vector file name: bcsstk/b_bcsstk.mtx ... file loaded
+Executing GPU CSR SpMV ... 
+Executing GPU ELL SpMV ... 
+Executing GPU SELL-C-Sigma SpMV ... 
+Executing GPU CSR5 SpMV ... 
+Executing GPU CSR5 SpMV (PART 2)... 
+number of tiles is 314
+Allocated with pitch: 80384 bytes
+First column: csr5[2][0] = 328839.29
+First column: csr5[1][0] = 744416021.73
+Kernel: Writing og_val[0]=365758.63 to csr5[0][0]
+Kernel: Writing og_val[1]=8243357.41 to csr5[0][1]
+Kernel: Writing og_val[2]=-0.00 to csr5[0][2]
+Kernel: Writing og_val[3]=5660883.60 to csr5[0][3]
+Kernel: Writing og_val[4]=0.00 to csr5[0][4]
+First column: csr5[0][0] = 365758.63
+Kernel completed: assigned 80519 values to 32x314 tiles
+Allocated with pitch: 40448 bytes
+First column: csr5[2][0] = 930
+First column: csr5[1][0] = 561
+Kernel: Writing og_val[0]=0 to csr5[0][0]
+Kernel: Writing og_val[1]=1 to csr5[0][1]
+Kernel: Writing og_val[2]=0 to csr5[0][2]
+Kernel: Writing og_val[3]=2 to csr5[0][3]
+Kernel: Writing og_val[4]=0 to csr5[0][4]
+First column: csr5[0][0] = 0
+Kernel completed: assigned 80519 values to 32x314 tiles
