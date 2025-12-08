@@ -183,71 +183,114 @@ __global__ void vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, 
 {
     // get thread id and position in warp
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    const int warp_id = tid / WARP_SIZE;
     const int lane_id = threadIdx.x % WARP_SIZE;
 
-    // initial access will be tid
-    int ind = tid;
-    int row;
-    double val;
-
     // make sure not outside of range
-    if (ind < nnz) {
-        row = row_ind[ind];
-        val = vals[ind] * x[col_ind[ind]];
-    } else {
-        row = -1;
-        val = 0.0;
-    }
+    int start = warp_id * WARP_SIZE;
+    int ind = start + lane_id;
 
-    while (ind < nnz) {
+    // load initial data
+    int row = (ind < nnz) ? row_ind[ind] : -1;
+    double val = (ind < nnz) ? vals[ind] * x[col_ind[ind]] : 0.0;
 
-        int next_ind = ind + WARP_SIZE;
-        int next_row = (next_ind < nnz ? row_ind[next_ind] : -1);
+    // process all non-zeros
+    while (true) {
+        unsigned int active = __activemask();
+        unsigned int valid_mask = __ballot_sync(active, ind < nnz);
 
-        // segment will end if any lane sees different next_row
-        bool bound_next_iter = __any_sync(0xffffffff, next_row != row);
+        // segmented scan
+        #pragma unroll
+        for (int offset = 1; offset < WARP_SIZE; offset <<= 2) {
+            // get value and row of thread offset above
+            double tmp_val = __shfl_up_sync(valid_mask, val, offset);
+            int tmp_row = __shfl_up_sync(valid_mask, row, offset);
 
-        // need to check within warp
-        int row_down = __shfl_down_sync(0xffffffff, row, 1);
-        bool bound_warp = (row != row_down);
-
-        // if change rows in this or next iteration, need to flush sums
-        if ((bound_warp || bound_next_iter) && row >= 0) {
-
-            // segmented scan
-            for (int offset = 1; offset < WARP_SIZE; offset *= 2) {
-                double tmp_val = __shfl_up_sync(0xffffffff, val, offset);
-                int tmp_row = __shfl_up_sync(0xffffffff, row, offset);
-                if (lane_id >= offset && tmp_row == row) {
-                    val += tmp_val;
-                }
+            // if same row, add value
+            if (lane_id >= offset && tmp_row == row) {
+                val += tmp_val;
             }
+        }
 
-            // segment leader writes result
-            int row_up = __shfl_down_sync(0xffffffff, row, 1);
-            if (lane_id == 0 && row >= 0) {
+        int row_down = __shfl_down_sync(valid_mask, row, 1);
+
+        // if last in segment, write result (rather than first in segment)
+        if (lane_id == WARP_SIZE - 1 || row != row_down) {
+            if (row >= 0 && row < m) {
                 atomicAdd(&b[row], val);
             }
-
-            val = 0.0;
+        }
+    
+        // get next index
+        ind = ind + WARP_SIZE;
+        if (ind >= nnz) {
+            break;
         }
 
-        ind = next_ind;
-        row = next_row;
-
-        if (ind < nnz) {
-            val += vals[ind] * x[col_ind[ind]];
-        } else {
-            val = 0.0;
-        }
+        // load data for next iteration
+        row = row_ind[ind];
+        val = vals[ind] * x[col_ind[ind]];
     }
 }
 
 __host__ void vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
                         double *x, double *b)
 {
-    int threads_per_block = 256;
-    int blocks_per_grid = (nnz + threads_per_block - 1) / threads_per_block; 
+    int threads = 256;
+    // each warp processes WARP_SIZE non-zeros
+    int num_warps = (nnz + WARP_SIZE - 1) / WARP_SIZE;
 
-    vector_coo_kernel<<<blocks_per_grid, threads_per_block>>>(col_ind, row_ind, vals, m, n, nnz, x, b);
+    // number of blocks needed based on number of warps and threads per block
+    int blocks = (num_warps + (threads / WARP_SIZE) - 1) 
+                     / (threads / WARP_SIZE);
+
+    vector_coo_kernel<<<blocks, threads>>>(
+        col_ind, row_ind, vals, m, n, nnz, x, b);
+}
+
+__global__ void simpler_vector_coo_kernel(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
+                        double *x, double *b)
+{
+    // get thread id and position in warp
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int lane_id = threadIdx.x % WARP_SIZE;
+
+    unsigned int mask = __activemask(); // all threads active
+
+    // iterate over all non-zeros
+    for (int i = tid; i < nnz; i += gridDim.x * blockDim.x) {
+        // load data
+        int row = row_ind[i];
+        double val = vals[i] * x[col_ind[i]];
+
+        // warp level reduction
+        for (int offset = 16; offset > 0; offset /= 2) {
+            // get value and row of thread offset above
+            int row_up = __shfl_up_sync(mask, row, offset);
+            double val_up = __shfl_up_sync(mask, val, offset);
+            // if same row, add value
+            if (lane_id >= offset && row_up == row) {
+                val += val_up;
+            }
+        }
+
+        // last thread in segment writes result
+        int row_down = __shfl_down_sync(mask, row, 1);
+        bool is_last_in_segment = (lane_id == WARP_SIZE - 1) || (row != row_down);
+
+        if (is_last_in_segment) {
+            atomicAdd(&b[row], val);
+        }
+    }
+}
+
+__host__ void simpler_vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *vals, int m, int n, int nnz,
+                        double *x, double *b)
+{
+    // launch kernel
+    int threads = 256;
+    int blocks  = (nnz + threads - 1) / threads;
+
+    simpler_vector_coo_kernel<<<blocks, threads>>>(
+        col_ind, row_ind, vals, m, n, nnz, x, b);
 }
