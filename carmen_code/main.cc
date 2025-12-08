@@ -234,16 +234,7 @@ void make_tile_desc(int rows, int omega, int sigma, int num_tiles, unsigned int 
 		
 		}
 	}
-	//end of loop
-	//free(temp_empty_rows);
-	/*fprintf(stdout, "empty tile\n");
-	for (int i = 0; i < empty_idx; i++){
-		int count = 0;
-		while ((*empty_idx_array)[i][count] != NULL){
-		fprintf(stdout, " %d,", (*empty_idx_array)[i][count]);
-		count++;
-				}
-	}*/
+	//end 
 
 
 	//EMPTY ARRAY FOR all ZERO TILEs
@@ -700,12 +691,15 @@ int main(int argc, char** argv) {
     int* seg_off_array = NULL;
     int** empty_array = NULL;
     int *cpu_tile_ptr = NULL;
-	
+	//timing for cpu writinge functions
+    t0 = ReadTSC();
     make_tile_ptr(m, omega, sigma, num_tiles_p, csr_row_ptr, &cpu_tile_ptr);    
 
     make_tile_desc(m, omega, sigma, num_tiles_p, csr_row_ptr, 
 		  &bit_flag_array, &y_off_array, 
 		  &seg_off_array, &empty_array, &cpu_tile_ptr);
+
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
 
     uint8_t* gpu_csr5_bit_flag = NULL;
     int* gpu_y_off_array = NULL;
@@ -713,11 +707,14 @@ int main(int argc, char** argv) {
     int** gpu_empty_array = NULL;
     //host wowow
     t0 = ReadTSC();
+
+
     convert_csr_to_csr5_gpu(m, n, nnz, csr_row_ptr, csr_col_ind, csr_vals,
 		        &sigma, 	&omega,  
                         &num_tiles_p, 		&gpu_csr5_vals, 	&gpu_csr5_col_idx, 
                         &gpu_csr5_row_idx, 	&gpu_csr5_tile_ptr, 	&gpu_csr5_bit_flag,
 			//additional cpu/gpu things from tile desc
+			&cpu_tile_ptr,
 			&bit_flag_array, 	&seg_off_array, 	&empty_array,
 		    	&y_off_array, 		&gpu_y_off_array,	&gpu_seg_off_array,
 			&gpu_empty_array);
@@ -730,11 +727,17 @@ int main(int argc, char** argv) {
     int* d2_csr5_row_idx = NULL;
     int* d2_csr5_tile_ptr = NULL;
     unsigned int* d2_csr5_tile_desc = NULL;
-    int csr5_capacity2 = csr5_num_tiles * 32 * 16;
+    //int csr5_capacity2 = csr5_num_tiles * 32 * 16;
     // Values
-
-
-
+	//running KERNEL!!!
+	//
+	
+    t0 = ReadTSC();
+    /*tile_spmv_gpu_csr5(m, n, nnz, num_tiles_p, 	gpu_csr5_vals, 	gpu_csr5_col_idx,
+    			gpu_csr5_row_idx, gpu_csr5_tile_ptr, 	gpu_csr5_bit_flag,
+			gpu_empty_array, gpu_y_off_array, 	gpu_seg_off_array);
+*/
+    timer[CONVERT_TIME] += ElapsedTime(ReadTSC() - t0);
     //END CARMEN CODE
 
 
