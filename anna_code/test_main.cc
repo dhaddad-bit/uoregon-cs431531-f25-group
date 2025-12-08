@@ -248,45 +248,42 @@ int main(int argc, char *argv[]) {
     int vec_size = 0;
     read_vector(vector_name, &vector, &vec_size);
 
-    unsigned int* drp; // row pointer on GPU
+    unsigned int* dri; // row pointer on GPU
     unsigned int* dci; // col index on GPU
     double* dv; // values on GPU
     double* dx; // input x on GPU
     double* db; // result b on GPU
 
-    allocate_csr_gpu(csr_rows_arr, csr_cols_arr, csr_nnz_arr, num_rows, num_cols, nnz, vector, &drp,
-                     &dci, &dv, &dx, &db);
-    //(drp, dci, dv, m, n, nnz, dx, db);
-    scalar_csr(dci, drp, dv, num_rows, num_cols, nnz, dx, db);
+    // if using vector COO: sort the arrays and change to 0-index
+    std::vector<COOEntry> coo_vec(nnz);
+    for (int i = 0; i < nnz; i++) {
+        coo_vec[i].row = coo_rows_arr[i] - 1; // 0-based
+        coo_vec[i].col = coo_cols_arr[i] - 1; // 0-based
+        coo_vec[i].val = coo_nnz_arr[i];
+    }
 
+    // sort by row, then by column
+    std::sort(coo_vec.begin(), coo_vec.end(),
+        [](const COOEntry &a, const COOEntry &b) {
+            if (a.row == b.row) return a.col < b.col;
+            return a.row < b.row;
+        });
+
+    // copy back to arrays
+    for (int i = 0; i < nnz; i++) {
+        coo_rows_arr[i] = coo_vec[i].row;
+        coo_cols_arr[i] = coo_vec[i].col;
+        coo_nnz_arr[i] = coo_vec[i].val;
+    }
+
+    allocate_coo_gpu(coo_rows_arr, coo_cols_arr, coo_nnz_arr, num_rows, num_cols, nnz, vector, 
+                    &dri, &dci, &dv, &dx, &db);
+
+    
+
+    vector_coo(dri, dci, dv, num_rows, num_cols, nnz, dx, db);
     double* b = (double*) malloc(sizeof(double) * num_rows);
     get_result_gpu(db, b, num_rows);
-
-    // // if using vector COO: sort the arrays and change to 0-index
-
-    // std::vector<COOEntry> coo_vec(nnz);
-    // for (int i = 0; i < nnz; i++) {
-    //     coo_vec[i].row = coo_rows_arr[i] - 1; // 0-based
-    //     coo_vec[i].col = coo_cols_arr[i] - 1; // 0-based
-    //     coo_vec[i].val = coo_nnz_arr[i];
-    // }
-
-    // std::sort(coo_vec.begin(), coo_vec.end(), [](const COOEntry &a, const COOEntry &b) {
-    //     return a.row < b.row;
-    // });
-
-    // for (int i = 0; i < nnz; i++) {
-    //     coo_rows_arr[i] = coo_vec[i].row;
-    //     coo_cols_arr[i] = coo_vec[i].col;
-    //     coo_nnz_arr[i] = coo_vec[i].val;
-    // }
-
-    // allocate_coo_gpu(coo_rows_arr, coo_cols_arr, coo_nnz_arr, num_rows, num_cols, nnz, vector, 
-    //                 &dri, &dci, &dv, &dx, &db);
-
-    // vector_coo(dci, dri, dv, num_rows, num_cols, nnz, dx, db);
-    // double* b = (double*) malloc(sizeof(double) * num_rows);
-    // get_result_gpu(db, b, num_rows);
 
     store_result(output_name, b, num_rows);
 
