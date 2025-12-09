@@ -76,6 +76,7 @@ void convert_csr_to_csr5_gpu(
     int** gpu_csr5_tile_ptr,
     uint8_t** gpu_csr5_bit_array,
     //additional 
+    int **cpu_tile_ptr,
     uint8_t** cpu_csr5_bit_array,
     int **seg_array, int ***empty_array,
     int **y_array, int **gpu_y_array, 
@@ -83,7 +84,20 @@ void convert_csr_to_csr5_gpu(
 
 );
 
-
+/*
+// Device-side SpMV function
+__global__ void tile_spmv_gpu_csr5(
+    int m, int n, int nnz,
+    int num_tiles,
+    double* val_tile,
+    int* col_tile,
+    int* row_ptr, // Row versioning of CSR5
+    int* tile_ptr,
+    uint8_t* bit_flag,
+    int* empty_flag,
+    int* y_flag,
+    int* seg_flag
+);*/
 
 // --- STPUID WRAPPER THING I DONT UNDERSTAND ---
 #ifdef __cplusplus

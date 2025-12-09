@@ -1,1 +1,0 @@
-/var/spool/slurm/job40696632/slurm_script: line 20: 1406931 Segmentation fault      (core dumped) ./spmv bcsstk/bcsstk18.mtx bcsstk/b_bcsstk.mtx ./test.mtx
