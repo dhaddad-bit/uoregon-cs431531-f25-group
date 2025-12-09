@@ -13,6 +13,9 @@ void scalar_coo(unsigned int* col_ind, unsigned int* row_ind, double* vals,
 void vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *vals,
                     int m, int n, int nnz, double *x, double *b);
 
+void simpler_vector_coo(unsigned int *col_ind, unsigned int *row_ind, double *vals,
+                    int m, int n, int nnz, double *x, double *b);
+
 void get_result_gpu(double* dev_b, double* b, int m);
 
 void allocate_csr_gpu(unsigned int* row_ptr, unsigned int* col_ind, 
