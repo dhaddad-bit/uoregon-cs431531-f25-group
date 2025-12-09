@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
     //     coo_nnz_arr[i] = coo_vec[i].val;
     // }
 
-    allocate_csr_gpu(coo_rows_arr, coo_cols_arr, coo_nnz_arr, num_rows, num_cols, nnz, vector, 
+    allocate_csr_gpu(csr_rows_arr, csr_cols_arr, csr_nnz_arr, num_rows, num_cols, nnz, vector, 
                     &drp, &dci, &dv, &dx, &db);
 
     
